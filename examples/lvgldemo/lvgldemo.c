@@ -36,12 +36,11 @@
 #include <lvgl/lvgl.h>
 #include <port/lv_port.h>
 #include <lvgl/demos/lv_demos.h>
-
+#include "lvgl_centeredbutton.h"
 #ifdef CONFIG_LIBUV
 #  include <uv.h>
 #  include <port/lv_port_libuv.h>
 #endif
-
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
@@ -100,6 +99,7 @@ static const struct func_key_pair_s func_key_pair[] =
 #ifdef CONFIG_LV_USE_DEMO_MUSIC
   { "music",          lv_demo_music          },
 #endif
+  {"centerbutton", lv_centered_button        },
   { "", NULL }
 };
 

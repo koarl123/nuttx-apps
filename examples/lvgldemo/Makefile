@@ -27,6 +27,6 @@ MODULE = $(CONFIG_EXAMPLES_LVGLDEMO)
 
 # LVGL demo Example
 
-MAINSRC = lvgldemo.c
+MAINSRC = lvgldemo.c lvgl_centeredbutton.c
 
 include $(APPDIR)/Application.mk
