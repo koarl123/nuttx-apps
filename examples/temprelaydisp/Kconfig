@@ -1,0 +1,23 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+menuconfig EXAMPLES_TEMPRELAYDISP
+	tristate "Temperature relay switch with display"
+	default n
+	depends on GRAPHICS_LVGL
+	---help---
+		My temperature relay switch app with display
+
+if EXAMPLES_TEMPRELAYDISP
+
+config EXAMPLES_TEMPRELAYDISP_PRIORITY
+	int "temprelaydisp task priority"
+	default 100
+
+config EXAMPLES_TEMPRELAYDISP_STACKSIZE
+	int "temprelaydisp stack size"
+	default 16384
+
+endif # EXAMPLES_TEMPRELAYDISP
