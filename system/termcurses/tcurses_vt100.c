@@ -36,6 +36,7 @@
 #include <debug.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <termios.h>
 
 #include "tcurses_priv.h"
 #include "graphics/curses.h"
@@ -74,6 +75,7 @@ struct tcurses_vt100_s
   int    out_fd;
   int    keycount;
   char   keybuf[16];
+  tcflag_t lflag;
 };
 
 /************************************************************************************
@@ -1465,6 +1467,7 @@ static bool tcurses_vt100_checkkey(FAR struct termcurses_s *dev)
 FAR struct termcurses_s *tcurses_vt100_initialize(int in_fd, int out_fd)
 {
   FAR struct tcurses_vt100_s *priv;
+  struct termios cfg;
 
   /* Allocate a new device structure */
 
@@ -1483,6 +1486,32 @@ FAR struct termcurses_s *tcurses_vt100_initialize(int in_fd, int out_fd)
   priv->out_fd   = out_fd;
   priv->keycount = 0;
 
+      if (isatty(priv->in_fd))
+        {
+          if (tcgetattr(priv->in_fd, &cfg) == 0)
+            {
+              /* Save current iflags */
+
+              priv->lflag = cfg.c_lflag;
+
+              /* If ECHO enabled, disable it */
+
+              if (cfg.c_lflag & ECHO)
+                {
+                  cfg.c_lflag &= ~ECHO;
+                  tcsetattr(priv->in_fd, TCSANOW, &cfg);
+                }
+            }
+          else
+            {
+              /* Get attr failed, mark ECHO bit zero to skip set attr in
+               * tcurses_vt100_terminate
+               */
+
+              priv->lflag = 0;
+            }
+        }
+
   return (FAR struct termcurses_s *)priv;
 }
 
@@ -1497,6 +1526,7 @@ FAR struct termcurses_s *tcurses_vt100_initialize(int in_fd, int out_fd)
 static int tcurses_vt100_terminate(FAR struct termcurses_s *dev)
 {
   FAR struct tcurses_vt100_s *priv;
+  struct termios cfg;
   int  fd;
 
   priv = (FAR struct tcurses_vt100_s *)dev;
@@ -1507,6 +1537,15 @@ static int tcurses_vt100_terminate(FAR struct termcurses_s *dev)
    */
 
   write(fd, g_setdefcolors, strlen(g_setdefcolors));
+
+      if (isatty(priv->in_fd))
+        {
+          if (tcgetattr(priv->in_fd, &cfg) == 0 && priv->lflag & ECHO)
+            {
+              cfg.c_lflag |= ECHO;
+              tcsetattr(priv->in_fd, TCSANOW, &cfg);
+            }
+        }
 
   return OK;
 }

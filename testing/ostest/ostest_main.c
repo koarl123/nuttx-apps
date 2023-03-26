@@ -25,15 +25,16 @@
 #include <nuttx/config.h>
 
 #include <sys/wait.h>
+#include <assert.h>
+#include <errno.h>
+#include <malloc.h>
+#include <sched.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <malloc.h>
-#include <unistd.h>
-#include <signal.h>
 #include <string.h>
-#include <sched.h>
-#include <errno.h>
+#include <unistd.h>
 
 #ifdef CONFIG_TESTING_OSTEST_POWEROFF
 #include <sys/boardctl.h>
@@ -355,6 +356,15 @@ static int user_main(int argc, char *argv[])
 
       printf("\nuser_main: waitpid test\n");
       waitpid_test();
+      check_test_memory_usage();
+#endif
+
+#if !defined(CONFIG_DISABLE_PTHREAD) && \
+    (defined(CONFIG_SCHED_LPWORK) || defined(CONFIG_SCHED_HPWORK))
+      /* Check work queues */
+
+      printf("\nuser_main: wqueue test\n");
+      wqueue_test();
       check_test_memory_usage();
 #endif
 

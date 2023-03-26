@@ -24,10 +24,12 @@
 
 #include <nuttx/config.h>
 
+#include <assert.h>
+#include <pthread.h>
+#include <sched.h>
+#include <semaphore.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include <semaphore.h>
-#include <sched.h>
 
 #include "ostest.h"
 
@@ -191,7 +193,6 @@ void rr_test(void)
 
   sched_lock();
   sem_init(&g_rrsem, 0, 0);
-  sem_setprotocol(&g_rrsem, SEM_PRIO_NONE);
 
   /* Start the threads */
 

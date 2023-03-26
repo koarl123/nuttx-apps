@@ -22,14 +22,16 @@
  * Included Files
  ****************************************************************************/
 
+#include <arpa/inet.h>
+#include <assert.h>
+#include <net/if.h>
+#include <netinet/in.h>
+#include <pthread.h>
+#include <sched.h>
+#include <stdbool.h>
 #include <sys/prctl.h>
 #include <sys/socket.h>
 #include <sys/time.h>
-#include <net/if.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <assert.h>
-#include <stdbool.h>
 #include <unistd.h>
 
 #include "iperf.h"
@@ -270,7 +272,7 @@ static void iperf_report_task(FAR void *arg)
              ts_diff(&last, &start),
              ts_diff(&now, &start),
              now_len -last_len,
-             (double)((now_len - last_len) * 8 / 1000000) /
+             ((double)((now_len - last_len) * 8) / 1000000) /
              (double)ts_diff(&now, &last)
              );
       if (time != 0 && ts_diff(&now, &start) >= time)
@@ -285,7 +287,7 @@ static void iperf_report_task(FAR void *arg)
              ts_diff(&start, &start),
              ts_diff(&now, &start),
              now_len,
-             (double)(now_len * 8 / 1000000) /
+             ((double)(now_len * 8) / 1000000) /
              (double)ts_diff(&now, &start)
              );
     }
