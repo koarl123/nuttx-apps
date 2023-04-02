@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <debug.h>
+#include <semaphore.h>
 
 #include <lvgl/lvgl.h>
 #include <port/lv_port.h>
@@ -65,7 +66,7 @@
 /****************************************************************************
  * Private Type Declarations
  ****************************************************************************/
-
+extern sem_t sem_lvgl;
 /****************************************************************************
  * Private Data
  ****************************************************************************/
@@ -91,8 +92,9 @@ static void lvgl_initialize( void )
   while (1)
     {
       uint32_t idle;
+      nxsem_wait(&sem_lvgl);
       idle = lv_timer_handler();
-
+      nxsem_post(&sem_lvgl);
       /* Minimum sleep of 1ms */
 
       idle = idle ? idle : 1;
