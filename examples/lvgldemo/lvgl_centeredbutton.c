@@ -21,7 +21,7 @@ static void btn_event_cb(lv_event_t * e)
 /**
  * Create a button with a label and react on click event.
  */
-void lv_centered_button(void)
+void myview_centered_button(void)
 {
     lv_obj_t * btn = lv_btn_create(lv_scr_act());     /*Add a button the current screen*/
     lv_obj_set_pos(btn, 60, 160-25);                            /*Set its position*/

@@ -20,13 +20,20 @@ struct adc_msg_s adc_data;
 static pthread_t gui_thread;
 static sem_t sem_input_dat;
 
-static void gyro_set_lbl_text_and_vals( lv_obj_t * lbl, float x, float y, float z, float temperature, int adc )
+static float calcResistorValueFromAdc(float adc)
 {
-    lv_label_set_text_fmt(lbl, "x %+2.2f\r\ny %+2.2f\r\nz %+2.2f\r\nt %+2.2f\r\na %d\r\n",
-                                x, y, z, temperature, adc);
+    int R1 = 4900; // Ohm
+    float Rtemp = ((4096 - adc) *R1) / adc;
+    return Rtemp;
 }
 
-static void gyro_changed_event_cb(lv_event_t * e)
+static void gyro_set_lbl_text_and_vals( lv_obj_t * lbl, float x, float y, float z, float temperature, int adc )
+{
+    lv_label_set_text_fmt(lbl, "x %+2.2f\r\ny %+2.2f\r\nz %+2.2f\r\nt %+2.2f\r\na %d\r\nR %4.2f\r\n",
+                                x, y, z, temperature, adc, calcResistorValueFromAdc(adc));
+}
+
+static void label_list_changed_event_cb(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t * lbl = lv_event_get_target(e);
@@ -53,23 +60,23 @@ static void btn_event_cb(lv_event_t * e)
 
         /*Get the first child of the button which is the label and change its text*/
         lv_obj_t * label = lv_obj_get_child(btn, 0);
-        lv_label_set_text_fmt(label, "Update Temp.: %d", cnt);
+        lv_label_set_text_fmt(label, "Clicks %d", cnt);
     }
 }
 
 /**
  * Create a button with a label and react on click event.
  */
-static void lv_centered_button(void)
+static void myview_centered_button(void)
 {
     lv_obj_t * btn = lv_btn_create(lv_scr_act());     /*Add a button the current screen*/
-    lv_obj_set_pos(btn, 60, 160-25);                            /*Set its position*/
-    lv_obj_set_size(btn, 120, 50);                          /*Set its size*/
+    lv_obj_set_pos(btn, 60, 40);                            /*Set its position*/
+    lv_obj_set_size(btn, 80, 60);                          /*Set its size*/
     lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_ALL, NULL);           /*Assign a callback to the button*/
 
     lv_obj_t * label = lv_label_create(btn);          /*Add a label to the button*/
-    lv_label_set_text(label, "Update Temp.");                     /*Set the labels text*/
+    lv_label_set_text(label, "Clicks");                     /*Set the labels text*/
     lv_obj_center(label);
 }
 
@@ -78,6 +85,7 @@ static void * gui_workerthread( void * arg)
     int fd_gyro, fd_adc;
     int ret;
     lv_obj_t * lbl = (lv_obj_t *) arg;
+
     fd_gyro = open("/dev/uorb/sensor_gyro_uncal0", O_RDONLY);
     fd_adc = open("/dev/adc0", O_RDONLY);
     if(fd_gyro < 0)
@@ -138,15 +146,15 @@ static void * gui_workerthread( void * arg)
     return NULL;
 }
 
-static void lv_gyroview_initialize( void )
+static void ly_myview_initialize( void )
 {
     pthread_attr_t tattr;
     struct sched_param sparam;
     int ret;
     lv_obj_t * lbl = lv_label_create(lv_scr_act());     /*Add a button the current screen*/
-    lv_obj_set_pos(lbl, 30, 160+35+5+60);                            /*Set its position*/
-    lv_obj_set_size(lbl, 180, 50);                          /*Set its size*/
-    lv_obj_add_event_cb(lbl, gyro_changed_event_cb, LV_EVENT_VALUE_CHANGED, NULL); /*Assign a callback to the gyro values*/
+    lv_obj_set_pos(lbl, 30, 160);                    /*Set its position*/
+    lv_obj_set_size(lbl, 180, 80);                      /*Set its size*/
+    lv_obj_add_event_cb(lbl, label_list_changed_event_cb, LV_EVENT_VALUE_CHANGED, NULL); /*Assign a callback to the gyro values*/
     nxsem_init(&sem_input_dat, 0, 1);
     // default initialization of gyro values
     gyro_set_lbl_text_and_vals(lbl, 0.1, 0.2, 0.3, 10.0, 1024);
@@ -182,7 +190,7 @@ static void lv_gyroview_initialize( void )
 void lv_myview(void)
 {
     /* centered button, as in example */
-    lv_centered_button();
+    myview_centered_button();
     /* next level: show gyro MEMS float values that is updated*/
-    lv_gyroview_initialize();
+    ly_myview_initialize();
 }

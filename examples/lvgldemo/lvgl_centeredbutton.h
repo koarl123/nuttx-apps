@@ -26,7 +26,7 @@ extern "C" {
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
-void lv_centered_button(void);
+void myview_centered_button(void);
 
 /**********************
  *      MACROS

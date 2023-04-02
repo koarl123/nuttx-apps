@@ -99,7 +99,7 @@ static const struct func_key_pair_s func_key_pair[] =
 #ifdef CONFIG_LV_USE_DEMO_MUSIC
   { "music",          lv_demo_music          },
 #endif
-  {"centerbutton", lv_centered_button        },
+  {"centerbutton", myview_centered_button        },
   { "", NULL }
 };
 
