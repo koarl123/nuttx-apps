@@ -23,7 +23,7 @@ include $(APPDIR)/Make.defs
 # LVGL demo Example lvgl_myview.c
 
 MAINSRC = temprelaydisp.c
-CSRCS = lvgl_myview.c
+CSRCS = lvgl_myview.c data_collect.c gui_update.c controller.c
 
 
 PROGNAME = temprelaydisp

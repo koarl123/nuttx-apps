@@ -21,12 +21,21 @@ extern "C" {
 /**********************
  *      TYPEDEFS
  **********************/
-
+// data from sensors
+struct autoboiler_data
+{
+    int temp_env;
+    int temp_probe;
+    bool relay_on;
+    int target_temp;
+};
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
 void lv_myview(void);
-
+void initialize_data_collection( struct autoboiler_data * autob_dat);
+void initialize_gui_update(struct autoboiler_data * autob_dat);
+void initialize_controller( struct autoboiler_data * autob_dat);
 /**********************
  *      MACROS
  **********************/
