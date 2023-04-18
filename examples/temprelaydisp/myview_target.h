@@ -16,5 +16,5 @@
 
 #define FILEPATH_ADC "/dev/adc0"
 #define FILEPATH_GYRO "/dev/uorb/sensor_gyro_uncal0"
-#define FILEPATH_RELAY "/dev/gpo0"
+#define FILEPATH_RELAY "/dev/gpio0"
 #endif

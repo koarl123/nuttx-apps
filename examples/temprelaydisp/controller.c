@@ -7,7 +7,6 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #else
-//#include <sys/ioctl.h>
 #include <fcntl.h>
 #endif
 

@@ -23,7 +23,7 @@ sem_t sem_lvgl;
 
 static void set_lbl_text_and_vals(lv_obj_t *lbl, int temp_env, int temp_probe)
 {
-    lv_label_set_text_fmt(lbl, "Env:     %i\r\nProbe: %i\r\n",
+    lv_label_set_text_fmt(lbl, "Env:   %3i\r\nProbe: %3i\r\n",
                           temp_env,
                           temp_probe);
 }
@@ -84,7 +84,7 @@ static void *gui_workerthread(void *arg)
 static void myview_init_label(void)
 {
     lv_obj_t *lbl = lv_label_create(lv_scr_act());                                       /*Add a button the current screen*/
-    lv_obj_set_pos(lbl, 60, 240);                                                        /*Set its position*/
+    lv_obj_set_pos(lbl, 30, 240);                                                        /*Set its position*/
     lv_obj_set_size(lbl, 120, 120);                                                      /*Set its size*/
 
     // default initialization of gyro values
@@ -124,17 +124,17 @@ static void myview_init_switch( void )
 {
     lv_obj_t * sw = lv_switch_create(lv_scr_act());
 
-    lv_obj_set_pos(sw, 180, 200); /*Set its position*/
+    lv_obj_set_pos(sw, 150, 280); /*Set its position*/
 
     lv_obj_add_state(sw, LV_STATE_CHECKED);
+    lv_obj_add_flag(sw, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(sw, switch_event_handler, LV_EVENT_ALL, (void*) lv_gui_objs.autob_dat_p);
 
     lv_gui_objs.lv_switch = sw;
 
-
     // label the switch
     lv_obj_t *lbl = lv_label_create(lv_scr_act());                                       /*Add a button the current screen*/
-    lv_obj_set_pos(lbl, 30, 210);                                                        /*Set its position*/
+    lv_obj_set_pos(lbl, 30, 290);                                                        /*Set its position*/
     lv_obj_set_size(lbl, 120, 120);                                                      /*Set its size*/
     lv_label_set_text_fmt(lbl, "Relay Switch:");
 }
@@ -146,8 +146,7 @@ static void myview_init_meter(void)
     const int temp_lim_hot = 90;
     const int temp_max = 110;
     lv_obj_t *meter = lv_meter_create(lv_scr_act());
-    // lv_obj_center(meter);
-    lv_obj_set_pos(meter, 10, 10); /*Set its position*/
+    lv_obj_set_pos(meter, 10, 55); /*Set its position*/
     lv_obj_set_size(meter, 180, 180);
 
     /*Remove the circle from the middle*/
@@ -205,7 +204,7 @@ static void myview_init_meter(void)
 
 }
 
-#define DROPDOWN_OPTIONS_STRING "70°C\n80°C\n90°C\n100°C"
+#define DROPDOWN_OPTIONS_STRING "70\n80\n90\n100"
 static const int DropDownOptionsTable[] =
 {
     70, 80, 90, 100
@@ -228,7 +227,7 @@ static void dropdown_changed_event_cb(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t *dd = lv_event_get_target(e);
-    struct autoboiler_data *autob_data = lv_event_get_param(e);
+    struct autoboiler_data *autob_data = lv_event_get_user_data(e);
     if (code == LV_EVENT_VALUE_CHANGED)
     {
         uint16_t index = lv_dropdown_get_selected(dd);
@@ -241,15 +240,17 @@ static void dropdown_changed_event_cb(lv_event_t * e)
 static void myview_init_targettemp_dropdown(void)
 {
     lv_obj_t * dd = lv_dropdown_create(lv_scr_act());
-    lv_obj_set_pos(dd, 180, 280); /*Set its position*/
+    lv_obj_set_pos(dd, 120, 10); /*Set its position*/
     lv_obj_set_size(dd, 100, 40);
     lv_dropdown_set_text(dd, "select\r\n");
+    lv_obj_add_flag(dd, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(dd, LV_OBJ_FLAG_HIDDEN);
     lv_dropdown_set_options(dd, DROPDOWN_OPTIONS_STRING);
-    lv_obj_add_event_cb(dd, dropdown_changed_event_cb, LV_EVENT_ALL, (void*) lv_gui_objs.autob_dat_p);
+    lv_obj_add_event_cb(dd, dropdown_changed_event_cb, LV_EVENT_ALL,(void*) lv_gui_objs.autob_dat_p);
 
     lv_obj_t * label = lv_label_create(lv_scr_act());
-    lv_label_set_text(label, "Target Temperature: \n");
-    lv_obj_set_pos(label, 30, 290);
+    lv_label_set_text(label, "Boil to: \n");
+    lv_obj_set_pos(label, 30, 20);
     lv_obj_set_size(label, 180, 40);
 }
 
@@ -263,7 +264,6 @@ void initialize_gui_update(struct autoboiler_data * autob_dat)
     myview_init_label();
     /* create the switch for the relay*/
     myview_init_switch();
-
     /* initialize the meter */
     myview_init_meter();
 

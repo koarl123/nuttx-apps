@@ -80,7 +80,7 @@ static void touchpad_read(FAR lv_indev_drv_t *drv, FAR lv_indev_data_t *data)
           lv_coord_t ver_max = disp_drv->ver_res - 1;
           lv_coord_t hor_max = disp_drv->hor_res - 1;
           sample.point[0].x = sample.point[0].x * hor_max / 0x0FFF;
-          sample.point[0].y = sample.point[0].y * ver_max / 0x0FFF;
+          sample.point[0].y = ver_max - (sample.point[0].y * ver_max / 0x0FFF);
           touchpad_obj->last_x = LV_CLAMP(0, sample.point[0].x, hor_max);
           touchpad_obj->last_y = LV_CLAMP(0, sample.point[0].y, ver_max);
           touchpad_obj->last_state = LV_INDEV_STATE_PR;
