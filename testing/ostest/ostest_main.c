@@ -204,7 +204,7 @@ static void show_environment(bool var1_valid, bool var2_valid,
   show_variable(g_var3_name, g_var3_value, var3_valid);
 }
 #else
-# define show_environment()
+#  define show_environment()
 #endif
 
 /****************************************************************************
@@ -300,7 +300,7 @@ static int user_main(int argc, char *argv[])
   check_test_memory_usage();
 #endif
 
-#if CONFIG_TLS_NELEM > 0
+#if defined(CONFIG_TLS_NELEM) && CONFIG_TLS_NELEM > 0
   /* Test TLS */
 
   tls_test();
@@ -325,9 +325,11 @@ static int user_main(int argc, char *argv[])
 
       /* Checkout /dev/null */
 
+#ifdef CONFIG_DEV_NULL
       printf("\nuser_main: /dev/null test\n");
-      dev_null();
+      dev_null_test();
       check_test_memory_usage();
+#endif
 
 #ifdef CONFIG_TESTING_OSTEST_AIO
       /* Check asynchronous I/O */
@@ -441,6 +443,14 @@ static int user_main(int argc, char *argv[])
       check_test_memory_usage();
 #endif
 
+#ifdef CONFIG_SCHED_WAITPID
+      /* Verify pthread_exit() and pthread_self() */
+
+      printf("\nuser_main: pthread_exit() test\n");
+      pthread_exit_test();
+      check_test_memory_usage();
+#endif
+
       /* Verify pthreads rwlock interfaces */
 
       printf("\nuser_main: pthread_rwlock test\n");
@@ -451,7 +461,7 @@ static int user_main(int argc, char *argv[])
       pthread_rwlock_cancel_test();
       check_test_memory_usage();
 
-#ifdef CONFIG_PTHREAD_CLEANUP
+#if CONFIG_PTHREAD_CLEANUP_STACKSIZE > 0
       /* Verify pthread cancellation cleanup handlers */
 
       printf("\nuser_main: pthread_cleanup test\n");
@@ -564,9 +574,20 @@ static int user_main(int argc, char *argv[])
       check_test_memory_usage();
 #endif /* CONFIG_PRIORITY_INHERITANCE && !CONFIG_DISABLE_PTHREAD */
 
-#if defined(CONFIG_ARCH_HAVE_VFORK) && defined(CONFIG_SCHED_WAITPID)
+#ifndef CONFIG_DISABLE_PTHREAD
+      printf("\nuser_main: scheduler lock test\n");
+      sched_lock_test();
+      check_test_memory_usage();
+#endif
+
+#if defined(CONFIG_ARCH_HAVE_FORK) && defined(CONFIG_SCHED_WAITPID)
       printf("\nuser_main: vfork() test\n");
       vfork_test();
+#endif
+
+#ifdef CONFIG_SMP_CALL
+      printf("\nuser_main: smp call test\n");
+      smp_call_test();
 #endif
 
       /* Compare memory usage at time ostest_main started until

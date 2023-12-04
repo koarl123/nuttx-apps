@@ -167,7 +167,7 @@ static inline void net_statistics(FAR struct nsh_vtbl_s *vtbl)
   nsh_catfile(vtbl, "ifconfig", CONFIG_NSH_PROC_MOUNTPOINT "/net/stat");
 }
 #else
-# define net_statistics(vtbl)
+#  define net_statistics(vtbl)
 #endif
 
 /****************************************************************************
@@ -555,6 +555,9 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
   struct in6_addr addr6;
   struct in6_addr gip6 = IN6ADDR_ANY_INIT;
   FAR char *preflen = NULL;
+#  ifdef CONFIG_NETDEV_MULTIPLE_IPv6
+  bool remove = false;
+#  endif
 #endif
   int i;
   FAR char *ifname = NULL;
@@ -580,6 +583,7 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
   FAR void *handle;
 #endif
   int ret;
+  int mtu = 0;
 
   /* With one or no arguments, ifconfig simply shows the status of the
    * network device:
@@ -716,9 +720,31 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #endif
               else if (!strcmp(tmp, "add"))
                 {
-                  /* Compatible with linux IPv6 command, do nothing. */
-
+#if defined(CONFIG_NET_IPv6) && defined(CONFIG_NETDEV_MULTIPLE_IPv6)
+                  remove = false;
                   continue;
+                }
+              else if (!strcmp(tmp, "del"))
+                {
+                  remove = true;
+#endif
+                  continue;
+                }
+              else if (!strcmp(tmp, "mtu"))
+                {
+                  if (argc - 1 >= i + 1)
+                    {
+                      mtu = atoi(argv[i + 1]);
+                      i++;
+                      if (mtu < 1280)
+                        {
+                          mtu = 1280;
+                        }
+                    }
+                  else
+                    {
+                      badarg = true;
+                    }
                 }
               else if (hostip == NULL && i <= 4)
                 {
@@ -758,6 +784,12 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
     }
 #endif
 
+  if (mtu != 0)
+    {
+      netlib_set_mtu(ifname, mtu);
+      return OK;
+    }
+
   /* Set IP address */
 
 #ifdef CONFIG_NET_IPv6
@@ -782,7 +814,9 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
           inet_pton(AF_INET6, hostip, &addr6);
         }
 
+#ifndef CONFIG_NETDEV_MULTIPLE_IPv6
       netlib_set_ipv6addr(ifname, &addr6);
+#endif
     }
 #endif /* CONFIG_NET_IPv6 */
 
@@ -876,23 +910,48 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
   if (inet6)
 #endif
     {
+      struct in6_addr mask6;
+#ifdef CONFIG_NETDEV_MULTIPLE_IPv6
+      uint8_t plen;
+#endif
       if (mask != NULL)
         {
           ninfo("Netmask: %s\n", mask);
-          inet_pton(AF_INET6, mask, &addr6);
+          inet_pton(AF_INET6, mask, &mask6);
         }
       else if (preflen != NULL)
         {
           ninfo("Prefixlen: %s\n", preflen);
-          netlib_prefix2ipv6netmask(atoi(preflen), &addr6);
+          netlib_prefix2ipv6netmask(atoi(preflen), &mask6);
         }
       else
         {
           ninfo("Netmask: Default\n");
-          inet_pton(AF_INET6, "ffff:ffff:ffff:ffff::", &addr6);
+          inet_pton(AF_INET6, "ffff:ffff:ffff:ffff::", &mask6);
         }
 
-      netlib_set_ipv6netmask(ifname, &addr6);
+#ifdef CONFIG_NETDEV_MULTIPLE_IPv6
+      plen = netlib_ipv6netmask2prefix(mask6.in6_u.u6_addr16);
+      if (remove)
+        {
+          ret = netlib_del_ipv6addr(ifname, &addr6, plen);
+        }
+      else
+        {
+          ret = netlib_add_ipv6addr(ifname, &addr6, plen);
+        }
+
+      if (ret < 0)
+        {
+          perror("Failed to manage IPv6 address");
+
+          /* REVISIT: Should we return ERROR or just let it go? */
+
+          return ERROR;
+        }
+#else
+      netlib_set_ipv6netmask(ifname, &mask6);
+#endif /* CONFIG_NETDEV_MULTIPLE_IPv6 */
     }
 #endif /* CONFIG_NET_IPv6 */
 
