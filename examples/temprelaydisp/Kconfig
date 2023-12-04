@@ -6,7 +6,7 @@
 menuconfig EXAMPLES_TEMPRELAYDISP
 	tristate "Temperature relay switch with display"
 	default n
-	depends on GRAPHICS_LVGL
+	depends on GRAPHICS_LVGL && DEV_GPIO
 	---help---
 		My temperature relay switch app with display
 

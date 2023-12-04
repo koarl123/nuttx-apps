@@ -1,13 +1,15 @@
-#include "myview_target.h"
+
 #include <stdbool.h>
 #include <pthread.h>
-#include "lvgl_myview.h"
+
 #ifdef SIMULATOR
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #else
 #include <fcntl.h>
+#include "lvgl_myview.h"
+#include "myview_target.h"
 #endif
 
 static void SetRelayState(int fd, bool On)

@@ -21,7 +21,7 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
+#ifndef SIMULATOR
 #include <nuttx/config.h>
 
 #include <sys/boardctl.h>
@@ -139,3 +139,4 @@ int main(int argc, FAR char *argv[])
   lvgl_initialize();
   return EXIT_SUCCESS;
 }
+#endif //SIMULATOR

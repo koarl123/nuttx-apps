@@ -1,6 +1,4 @@
 
-//#define SIMULATOR 1
-
 #ifdef SIMULATOR
 #include "myview_simulator.h"
 #include <unistd.h>
