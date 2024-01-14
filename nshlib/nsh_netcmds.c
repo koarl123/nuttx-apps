@@ -90,7 +90,7 @@
 #  endif
 #endif
 
-#if defined(CONFIG_NETINIT_DHCPC) || defined(CONFIG_NETINIT_DNS)
+#ifdef CONFIG_NETINIT_DHCPC
 #  include "netutils/dhcpc.h"
 #endif
 
@@ -550,6 +550,7 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #ifdef CONFIG_NET_IPv4
   struct in_addr addr;
   in_addr_t gip = INADDR_ANY;
+  in_addr_t mip;
 #endif
 #ifdef CONFIG_NET_IPv6
   struct in6_addr addr6;
@@ -568,7 +569,7 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #ifdef HAVE_HWADDR
   FAR char *hw = NULL;
 #endif
-#if defined(CONFIG_NETINIT_DHCPC) || defined(CONFIG_NETINIT_DNS)
+#ifdef CONFIG_NETDB_DNSCLIENT
   FAR char *dns = NULL;
 #endif
 #if defined(CONFIG_NET_IPv4) && defined(CONFIG_NET_IPv6)
@@ -704,7 +705,7 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
                 }
 #endif
 
-#if defined(CONFIG_NETINIT_DHCPC) || defined(CONFIG_NETINIT_DNS)
+#ifdef CONFIG_NETDB_DNSCLIENT
               else if (!strcmp(tmp, "dns"))
                 {
                   if (argc - 1 >= i + 1)
@@ -811,7 +812,12 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
             }
 
           ninfo("Host IP: %s\n", hostip);
-          inet_pton(AF_INET6, hostip, &addr6);
+          ret = inet_pton(AF_INET6, hostip, &addr6);
+          if (ret <= 0)
+            {
+              nsh_error(vtbl, g_fmtarginvalid, argv[0]);
+              return ERROR;
+            }
         }
 
 #ifndef CONFIG_NETDEV_MULTIPLE_IPv6
@@ -855,54 +861,6 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
     }
 #endif /* CONFIG_NET_IPv4 */
 
-  /* Set gateway */
-
-#ifdef CONFIG_NET_IPv6
-#ifdef CONFIG_NET_IPv4
-  if (inet6)
-#endif
-    {
-      /* Only set the gateway address if it was explicitly provided. */
-
-      if (gwip != NULL)
-        {
-          ninfo("Gateway: %s\n", gwip);
-          inet_pton(AF_INET6, gwip, &addr6);
-
-          netlib_set_dripv6addr(ifname, &addr6);
-          gip6 = addr6;
-        }
-    }
-#endif /* CONFIG_NET_IPv6 */
-
-#ifdef CONFIG_NET_IPv4
-#ifdef CONFIG_NET_IPv6
-  else
-#endif
-    {
-      if (gwip != NULL)
-        {
-          ninfo("Gateway: %s\n", gwip);
-          gip = addr.s_addr = inet_addr(gwip);
-        }
-      else
-        {
-          if (gip != 0)
-            {
-              ninfo("Gateway: default\n");
-              gip  = NTOHL(gip);
-              gip &= ~0x000000ff;
-              gip |= 0x00000001;
-              gip  = HTONL(gip);
-            }
-
-          addr.s_addr = gip;
-        }
-
-      netlib_set_dripv4addr(ifname, &addr);
-    }
-#endif /* CONFIG_NET_IPv4 */
-
   /* Set network mask */
 
 #ifdef CONFIG_NET_IPv6
@@ -917,7 +875,12 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
       if (mask != NULL)
         {
           ninfo("Netmask: %s\n", mask);
-          inet_pton(AF_INET6, mask, &mask6);
+          ret = inet_pton(AF_INET6, mask, &mask6);
+          if (ret <= 0)
+            {
+              nsh_error(vtbl, g_fmtarginvalid, argv[0]);
+              return ERROR;
+            }
         }
       else if (preflen != NULL)
         {
@@ -971,13 +934,67 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
           addr.s_addr = inet_addr("255.255.255.0");
         }
 
+      mip = addr.s_addr;
       netlib_set_ipv4netmask(ifname, &addr);
+    }
+#endif /* CONFIG_NET_IPv4 */
+
+  /* Set gateway */
+
+#ifdef CONFIG_NET_IPv6
+#ifdef CONFIG_NET_IPv4
+  if (inet6)
+#endif
+    {
+      /* Only set the gateway address if it was explicitly provided. */
+
+      if (gwip != NULL)
+        {
+          ninfo("Gateway: %s\n", gwip);
+          ret = inet_pton(AF_INET6, gwip, &addr6);
+          if (ret <= 0)
+            {
+              nsh_error(vtbl, g_fmtarginvalid, argv[0]);
+              return ERROR;
+            }
+
+          netlib_set_dripv6addr(ifname, &addr6);
+          gip6 = addr6;
+        }
+    }
+#endif /* CONFIG_NET_IPv6 */
+
+#ifdef CONFIG_NET_IPv4
+#ifdef CONFIG_NET_IPv6
+  else
+#endif
+    {
+      if (gwip != NULL)
+        {
+          ninfo("Gateway: %s\n", gwip);
+          gip = addr.s_addr = inet_addr(gwip);
+        }
+      else
+        {
+          if (gip != INADDR_ANY)
+            {
+              ninfo("Gateway: default\n");
+              gip  = ntohl(gip);
+              gip &= ntohl(mip);
+              gip |= 0x00000001;
+              gip  = htonl(gip);
+            }
+
+          addr.s_addr = gip;
+        }
+
+      netlib_set_dripv4addr(ifname, &addr);
     }
 #endif /* CONFIG_NET_IPv4 */
 
   UNUSED(ifname); /* Not used in all configurations */
 
-#if defined(CONFIG_NETINIT_DHCPC) || defined(CONFIG_NETINIT_DNS)
+#ifdef CONFIG_NETDB_DNSCLIENT
 #ifdef CONFIG_NET_IPv6
 #ifdef CONFIG_NET_IPv4
   if (inet6)
@@ -986,7 +1003,12 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
       if (dns != NULL)
         {
           ninfo("DNS: %s\n", dns);
-          inet_pton(AF_INET6, dns, &addr6);
+          ret = inet_pton(AF_INET6, dns, &addr6);
+          if (ret <= 0)
+            {
+              nsh_error(vtbl, g_fmtarginvalid, argv[0]);
+              return ERROR;
+            }
         }
       else
         {
@@ -1017,7 +1039,7 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
       netlib_set_ipv4dnsaddr(&addr);
     }
 #endif /* CONFIG_NET_IPv4 */
-#endif /* CONFIG_NETINIT_DHCPC || CONFIG_NETINIT_DNS */
+#endif /* CONFIG_NETDB_DNSCLIENT */
 
 #if defined(CONFIG_NETINIT_DHCPC)
   /* Get the MAC address of the NIC */
@@ -1052,10 +1074,12 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
               netlib_set_dripv4addr("eth0", &ds.default_router);
             }
 
+#ifdef CONFIG_NETDB_DNSCLIENT
           if (ds.dnsaddr.s_addr != 0)
             {
               netlib_set_ipv4dnsaddr(&ds.dnsaddr);
             }
+#endif
 
           dhcpc_close(handle);
         }

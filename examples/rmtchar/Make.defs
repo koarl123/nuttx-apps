@@ -1,5 +1,5 @@
 ############################################################################
-# apps/examples/hello_nim/Makefile
+# apps/examples/rmtchar/Make.defs
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -18,33 +18,6 @@
 #
 ############################################################################
 
-include $(APPDIR)/Make.defs
-
-# Hello, World! (Nim) built-in application info
-
-PROGNAME  = $(CONFIG_EXAMPLES_HELLO_NIM_PROGNAME)
-PRIORITY  = $(CONFIG_EXAMPLES_HELLO_NIM_PRIORITY)
-STACKSIZE = $(CONFIG_EXAMPLES_HELLO_NIM_STACKSIZE)
-MODULE    = $(CONFIG_EXAMPLES_HELLO_NIM)
-
-# Hello, World! Example
-
-NIMPATH = $(shell choosenim show path)
-CFLAGS += -I $(NIMPATH)/lib -I ../../.nimcache
-CSRCS += $(wildcard ../../.nimcache/*.c)
-
-MAINSRC = hello_nim_main.c
-
-.nimc: hello_nim_async.nim
-	nim c --header $<
-	touch .nimc
-
-$(MAINSRC): .nimc
-
-clean::
-	$(call DELDIR, .nimcache)
-	$(call DELFILE, .nimc)
-
-all:: .nimc $(MAINSRC)
-
-include $(APPDIR)/Application.mk
+ifneq ($(CONFIG_EXAMPLES_RMTCHAR),)
+CONFIGURED_APPS += $(APPDIR)/examples/rmtchar
+endif

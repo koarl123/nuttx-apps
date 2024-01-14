@@ -1,5 +1,5 @@
 ############################################################################
-# apps/examples/hello_nim/Makefile
+# apps/examples/rmtchar/Makefile
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -20,31 +20,22 @@
 
 include $(APPDIR)/Make.defs
 
-# Hello, World! (Nim) built-in application info
+# rmt character driver test
 
-PROGNAME  = $(CONFIG_EXAMPLES_HELLO_NIM_PROGNAME)
-PRIORITY  = $(CONFIG_EXAMPLES_HELLO_NIM_PRIORITY)
-STACKSIZE = $(CONFIG_EXAMPLES_HELLO_NIM_STACKSIZE)
-MODULE    = $(CONFIG_EXAMPLES_HELLO_NIM)
+ifeq ($(CONFIG_EXAMPLES_RMTCHAR_TX),y)
+CSRCS += rmtchar_transmitter.c
+endif
+ifeq ($(CONFIG_EXAMPLES_RMTCHAR_RX),y)
+CSRCS += rmtchar_receiver.c
+endif
+CSRCS += rmtchar_common.c
+MAINSRC = rmtchar_main.c
 
-# Hello, World! Example
+# Touchscreen built-in application info
 
-NIMPATH = $(shell choosenim show path)
-CFLAGS += -I $(NIMPATH)/lib -I ../../.nimcache
-CSRCS += $(wildcard ../../.nimcache/*.c)
-
-MAINSRC = hello_nim_main.c
-
-.nimc: hello_nim_async.nim
-	nim c --header $<
-	touch .nimc
-
-$(MAINSRC): .nimc
-
-clean::
-	$(call DELDIR, .nimcache)
-	$(call DELFILE, .nimc)
-
-all:: .nimc $(MAINSRC)
+PROGNAME = rmtchar
+PRIORITY = SCHED_PRIORITY_DEFAULT
+STACKSIZE = $(CONFIG_DEFAULT_TASK_STACKSIZE)
+MODULE = $(CONFIG_EXAMPLES_RMTCHAR)
 
 include $(APPDIR)/Application.mk
