@@ -773,9 +773,9 @@ int wapi_set_essid(int sock, FAR const char *ifname, FAR const char *essid,
 
   /* Prepare request. */
 
+  snprintf(buf, sizeof(buf), "%s", essid);
   wrq.u.essid.pointer = buf;
-  wrq.u.essid.length =
-    snprintf(buf, ((WAPI_ESSID_MAX_SIZE + 1) * sizeof(char)), "%s", essid);
+  wrq.u.essid.length = strlen(buf);
   wrq.u.essid.flags = flag;
 
   strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
@@ -1184,6 +1184,23 @@ int wapi_scan_channel_init(int sock, FAR const char *ifname,
                            FAR const char *essid,
                            uint8_t *channels, int num_channels)
 {
+  return wapi_escan_channel_init(sock, ifname, IW_SCAN_TYPE_ACTIVE, essid,
+                                 channels, num_channels);
+}
+
+/****************************************************************************
+ * Name: wapi_escan_channel_init
+ *
+ * Description:
+ *   Starts a scan on the given interface. Root privileges are required to
+ *   start a scan with specified channels.
+ *
+ ****************************************************************************/
+
+int wapi_escan_channel_init(int sock, FAR const char *ifname,
+                           uint8_t scan_type, FAR const char *essid,
+                           uint8_t *channels, int num_channels)
+{
   struct iw_scan_req req;
   struct iwreq wrq =
   {
@@ -1193,16 +1210,13 @@ int wapi_scan_channel_init(int sock, FAR const char *ifname,
   int ret;
   int i;
 
+  memset(&req, 0, sizeof(req));
+
   if (essid && (essid_len = strlen(essid)) > 0)
     {
-      memset(&req, 0, sizeof(req));
-      req.essid_len       = essid_len;
-      req.bssid.sa_family = ARPHRD_ETHER;
-      memset(req.bssid.sa_data, 0xff, IFHWADDRLEN);
+      req.essid_len    = essid_len;
       memcpy(req.essid, essid, essid_len);
-      wrq.u.data.pointer  = (caddr_t)&req;
-      wrq.u.data.length   = sizeof(req);
-      wrq.u.data.flags    = IW_SCAN_THIS_ESSID;
+      wrq.u.data.flags = IW_SCAN_THIS_ESSID;
     }
 
   if (channels && num_channels > 0)
@@ -1213,6 +1227,12 @@ int wapi_scan_channel_init(int sock, FAR const char *ifname,
           req.channel_list[i].m = channels[i];
         }
     }
+
+  req.scan_type       = scan_type;
+  req.bssid.sa_family = ARPHRD_ETHER;
+  memset(req.bssid.sa_data, 0xff, IFHWADDRLEN);
+  wrq.u.data.pointer  = (caddr_t)&req;
+  wrq.u.data.length   = sizeof(req);
 
   strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCSIWSCAN, (unsigned long)((uintptr_t)&wrq));
@@ -1238,6 +1258,21 @@ int wapi_scan_channel_init(int sock, FAR const char *ifname,
 int wapi_scan_init(int sock, FAR const char *ifname, FAR const char *essid)
 {
   return wapi_scan_channel_init(sock, ifname, essid, NULL, 0);
+}
+
+/****************************************************************************
+ * Name: wapi_escan_init
+ *
+ * Description:
+ *   Starts a extended scan on the given interface, you can specify the scan
+ *   type. Root privileges are required to start a scan.
+ *
+ ****************************************************************************/
+
+int wapi_escan_init(int sock, FAR const char *ifname,
+                   uint8_t scan_type, FAR const char *essid)
+{
+  return wapi_escan_channel_init(sock, ifname, scan_type, essid, NULL, 0);
 }
 
 /****************************************************************************
@@ -1588,6 +1623,156 @@ int wapi_get_pta_prio(int sock, FAR const char *ifname,
       int errcode = errno;
       WAPI_IOCTL_STRERROR(SIOCGIWPTAPRIO, errcode);
       ret = -errcode;
+    }
+
+  return ret;
+}
+
+/****************************************************************************
+ * Name: wapi_set_pmksa
+ *
+ * Description:
+ *   Set the wlan pmksa.
+ *
+ ****************************************************************************/
+
+int wapi_set_pmksa(int sock, FAR const char *ifname,
+                   FAR const uint8_t *pmk, int len)
+{
+  struct iwreq wrq =
+  {
+  };
+
+  int ret;
+
+  WAPI_VALIDATE_PTR(pmk);
+
+  wrq.u.data.pointer = (FAR void *)pmk;
+  wrq.u.data.length = len;
+
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  ret = ioctl(sock, SIOCSIWPMKSA, (unsigned long)((uintptr_t)&wrq));
+  if (ret < 0)
+    {
+      int errcode = errno;
+      WAPI_IOCTL_STRERROR(SIOCSIWPMKSA, errcode);
+      ret = -errcode;
+    }
+
+  return ret;
+}
+
+/****************************************************************************
+ * Name: wapi_get_pmksa
+ *
+ * Description:
+ *   Get the wlan pmksa.
+ *
+ ****************************************************************************/
+
+int wapi_get_pmksa(int sock, FAR const char *ifname,
+                   FAR uint8_t *pmk, int len)
+{
+  struct iwreq wrq =
+  {
+  };
+
+  int ret;
+
+  WAPI_VALIDATE_PTR(pmk);
+
+  wrq.u.data.pointer = pmk;
+  wrq.u.data.length = len;
+
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  ret = ioctl(sock, SIOCGIWPMKSA, (unsigned long)((uintptr_t)&wrq));
+  if (ret < 0)
+    {
+      int errcode = errno;
+      WAPI_IOCTL_STRERROR(SIOCGIWPMKSA, errcode);
+      ret = -errcode;
+    }
+
+  return ret;
+}
+
+/****************************************************************************
+ * Name: wapi_extend_params
+ *
+ * Description:
+ *   wapi extension interface for privatization method.
+ *
+ ****************************************************************************/
+
+int wapi_extend_params(int sock, int cmd, FAR struct iwreq *wrq)
+{
+  int ret;
+
+  WAPI_VALIDATE_PTR(wrq);
+
+  if (cmd < SIOCIWFIRSTPRIV || cmd > SIOCIWLASTPRIV)
+    {
+      wlerr("extend ioctl cmd invalid");
+      return -EINVAL;
+    }
+
+  ret = ioctl(sock, cmd, (unsigned long)((uintptr_t)wrq));
+  if (ret < 0)
+    {
+      int errcode = errno;
+      wlerr("extend ioctl(%d): %d", cmd, errcode);
+      ret = -errcode;
+    }
+
+  return ret;
+}
+
+/****************************************************************************
+ * Name: wapi_set_power_save
+ *
+ * Description:
+ *   Set power save status of wifi.
+ *
+ ****************************************************************************/
+
+int wapi_set_power_save(int sock, FAR const char *ifname, bool on)
+{
+  struct iwreq wrq =
+  {
+  };
+
+  int ret;
+
+  wrq.u.power.flags = on;
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  ret = wapi_extend_params(sock, SIOCSIWPWSAVE, &wrq);
+
+  return ret;
+}
+
+/****************************************************************************
+ * Name: wapi_get_power_save
+ *
+ * Description:
+ *   Get power save status of wifi.
+ *
+ ****************************************************************************/
+
+int wapi_get_power_save(int sock, FAR const char *ifname, bool *on)
+{
+  struct iwreq wrq =
+  {
+  };
+
+  int ret;
+
+  WAPI_VALIDATE_PTR(on);
+
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  ret = wapi_extend_params(sock, SIOCGIWPWSAVE, &wrq);
+  if (ret >= 0)
+    {
+      *on = wrq.u.power.flags;
     }
 
   return ret;

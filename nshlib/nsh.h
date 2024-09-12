@@ -654,15 +654,16 @@ enum nsh_npflags_e
 struct nsh_parser_s
 {
 #ifndef CONFIG_NSH_DISABLEBG
-  bool     np_bg;       /* true: The last command executed in background */
+  bool     np_bg;        /* true: The last command executed in background */
 #endif
-  bool     np_redirect; /* true: Output from the last command was re-directed */
-  bool     np_fail;     /* true: The last command failed */
+  bool     np_redir_out; /* true: Output from the last command was re-directed */
+  bool     np_redir_in;  /* true: Input from the last command was re-directed */
+  bool     np_fail;      /* true: The last command failed */
 #ifndef CONFIG_NSH_DISABLESCRIPT
-  uint8_t  np_flags;    /* See nsh_npflags_e above */
+  uint8_t  np_flags;     /* See nsh_npflags_e above */
 #endif
 #ifndef CONFIG_NSH_DISABLEBG
-  int      np_nice;     /* "nice" value applied to last background cmd */
+  int      np_nice;      /* "nice" value applied to last background cmd */
 #endif
 
 #ifndef CONFIG_NSH_DISABLESCRIPT
@@ -748,7 +749,6 @@ extern const char g_loginsuccess[];
 extern const char g_badcredentials[];
 extern const char g_loginfailure[];
 #endif
-extern const char g_nshprompt[];
 extern const char g_fmtsyntax[];
 extern const char g_fmtargrequired[];
 extern const char g_fmtnomatching[];
@@ -825,6 +825,11 @@ int nsh_session(FAR struct console_stdio_s *pstate,
                 int login, int argc, FAR char *argv[]);
 int nsh_parse(FAR struct nsh_vtbl_s *vtbl, FAR char *cmdline);
 
+/* Prompt string handling */
+
+FAR const char *nsh_prompt(void);
+void nsh_update_prompt(void);
+
 /****************************************************************************
  * Name: nsh_login
  *
@@ -848,12 +853,14 @@ int nsh_command(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char *argv[]);
 
 #ifdef CONFIG_NSH_BUILTIN_APPS
 int nsh_builtin(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
-                FAR char **argv, FAR const char *redirfile, int oflags);
+                FAR char **argv, FAR const char *redirfile_in,
+                FAR const char *redirfile_out, int oflags);
 #endif
 
 #ifdef CONFIG_NSH_FILE_APPS
 int nsh_fileapp(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
-                FAR char **argv, FAR const char *redirfile, int oflags);
+                FAR char **argv, FAR const char *redirfile_in,
+                FAR const char *redirfile_out, int oflags);
 #endif
 
 #ifndef CONFIG_DISABLE_ENVIRON
@@ -1139,6 +1146,15 @@ int cmd_switchboot(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv);
 #if defined(CONFIG_BOARDCTL_RESET_CAUSE) && !defined(CONFIG_NSH_DISABLE_RESET_CAUSE)
   int cmd_reset_cause(FAR struct nsh_vtbl_s *vtbl, int argc,
                       FAR char **argv);
+#endif
+
+#if defined(CONFIG_BOARDCTL_IRQ_AFFINITY) && !defined(CONFIG_NSH_DISABLE_IRQ_AFFINITY)
+  int cmd_irq_affinity(FAR struct nsh_vtbl_s *vtbl, int argc,
+                       FAR char **argv);
+#endif
+
+#if defined(CONFIG_RPMSG) && !defined(CONFIG_NSH_DISABLE_RPMSG)
+  int cmd_rpmsg(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv);
 #endif
 
 #if defined(CONFIG_RPTUN) && !defined(CONFIG_NSH_DISABLE_RPTUN)

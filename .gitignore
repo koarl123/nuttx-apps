@@ -1,13 +1,13 @@
 *.a
 *.adb
 *.asm
-*.d
 *.dSYM
 *.exe
 *.gcno
 *.gcda
 *.hobj
 *.i
+*.inf
 *.lib
 *.lst
 *.o
@@ -23,7 +23,7 @@
 .context
 .depend
 .kconfig
-/*.lock
+*.lock
 /bin
 /boot_romfsimg.h
 /external
@@ -39,3 +39,7 @@ Make.dep
 .dirlinks
 .vscode
 .DS_Store
+build
+.ccls-cache
+compile_commands.json
+.aider*

@@ -20,7 +20,14 @@
 
 if(CONFIG_TESTING_OSTEST)
 
-  set(SRCS getopt.c restart.c sigprocmask.c sighand.c signest.c sighelper.c)
+  set(SRCS
+      getopt.c
+      libc_memmem.c
+      restart.c
+      sigprocmask.c
+      sighand.c
+      signest.c
+      sighelper.c)
 
   if(CONFIG_DEV_NULL)
     list(APPEND SRCS dev_null.c)
@@ -136,8 +143,11 @@ if(CONFIG_TESTING_OSTEST)
     list(APPEND SRCS smp_call.c)
   endif()
 
-  target_sources(apps PRIVATE ${SRCS})
+  if(CONFIG_SCHED_EVENTS AND CONFIG_BUILD_FLAT)
+    list(APPEND SRCS nxevent.c)
+  endif()
 
-  nuttx_add_application(NAME ostest SRCS ostest_main.c)
+  set(OSTEST_SRCS ostest_main.c ${SRCS})
+  nuttx_add_application(NAME ostest SRCS ${OSTEST_SRCS})
 
 endif()

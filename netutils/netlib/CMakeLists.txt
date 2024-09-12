@@ -53,6 +53,9 @@ if(CONFIG_NETUTILS_NETLIB)
     if(CONFIG_NET_IPTABLES)
       list(APPEND SRCS netlib_iptables.c)
     endif()
+    if(CONFIG_NETUTILS_DHCPC)
+      list(APPEND SRCS netlib_obtainipv4addr.c)
+    endif()
   endif()
 
   if(CONFIG_NET_IPv6)
@@ -62,7 +65,7 @@ if(CONFIG_NETUTILS_NETLIB)
     list(APPEND SRCS netlib_prefix2ipv6netmask.c netlib_ipv6netmask2prefix.c)
     list(APPEND SRCS netlib_ipv6adaptor.c)
     if(CONFIG_NET_ICMPv6_AUTOCONF)
-      list(APPEND SRCS netlib_autoconfig.c)
+      list(APPEND SRCS netlib_autoconfig.c netlib_obtainipv6addr.c)
     endif()
     if(CONFIG_NETDB_DNSCLIENT)
       list(APPEND SRCS netlib_setipv6dnsaddr.c)
@@ -73,6 +76,9 @@ if(CONFIG_NETUTILS_NETLIB)
     if(CONFIG_NETLINK_ROUTE)
       list(APPEND SRCS netlib_getnbtab.c)
     endif()
+    if(CONFIG_NET_IPTABLES)
+      list(APPEND SRCS netlib_ip6tables.c)
+    endif()
   endif()
 
   # Device support
@@ -82,6 +88,12 @@ if(CONFIG_NETUTILS_NETLIB)
     if(CONFIG_NET_ROUTE)
       list(APPEND SRCS netlib_getroute.c)
     endif()
+  endif()
+
+  # Netfilter connection support
+
+  if(CONFIG_NETLINK_NETFILTER)
+    list(APPEND SRCS netlib_conntrack.c)
   endif()
 
   # These require TCP support
@@ -109,6 +121,10 @@ if(CONFIG_NETUTILS_NETLIB)
   if(CONFIG_WIRELESS_IEEE802154)
     list(APPEND SRCS netlib_seteaddr.c netlib_getpanid.c netlib_saddrconv.c
          netlib_eaddrconv.c)
+  endif()
+
+  if(CONFIG_NETDEV_STATISTICS)
+    list(APPEND SRCS netlib_getifstatistics.c)
   endif()
 
   if(CONFIG_WIRELESS_PKTRADIO)

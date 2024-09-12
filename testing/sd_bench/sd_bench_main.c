@@ -80,22 +80,22 @@ typedef struct sdb_config
 static const char *BENCHMARK_FILE =
     CONFIG_TESTING_SD_BENCH_DEVICE "/sd_bench";
 
-const size_t max_block = 65536;
-const size_t min_block = 1;
-const size_t default_block = 512;
+static const size_t max_block = 65536;
+static const size_t min_block = 1;
+static const size_t default_block = 512;
 
-const size_t max_runs = 10000;
-const size_t min_runs = 1;
-const size_t default_runs = 5;
+static const size_t max_runs = 10000;
+static const size_t min_runs = 1;
+static const size_t default_runs = 5;
 
-const size_t max_duration = 60000;
-const size_t min_duration = 1;
-const size_t default_duration = 2000;
+static const size_t max_duration = 60000;
+static const size_t min_duration = 1;
+static const size_t default_duration = 2000;
 
-const bool default_keep_test = false;
-const bool default_fsync = false;
-const bool default_verify = true;
-const bool default_aligned = false;
+static const bool default_keep_test = false;
+static const bool default_fsync = false;
+static const bool default_verify = true;
+static const bool default_aligned = false;
 
 /****************************************************************************
  * Private Function Prototypes
@@ -107,11 +107,11 @@ static int read_test(int fd, sdb_config_t *cfg, uint8_t *block,
                      int block_size);
 
 static uint64_t time_fsync_us(int fd);
-struct timespec get_abs_time(void);
-uint64_t get_elapsed_time_us(const struct timespec *start);
-uint64_t time_fsync_us(int fd);
-float ts_to_kb(uint64_t bytes, uint64_t elapsed);
-float block_count_to_mb(size_t blocks, size_t block_size);
+static struct timespec get_abs_time(void);
+static uint64_t get_elapsed_time_us(const struct timespec *start);
+static uint64_t time_fsync_us(int fd);
+static float ts_to_kb(uint64_t bytes, uint64_t elapsed);
+static float block_count_to_mb(size_t blocks, size_t block_size);
 static const char *print_bool(const bool value);
 static void usage(void);
 
@@ -119,15 +119,15 @@ static void usage(void);
  * Private Functions
  ****************************************************************************/
 
-struct timespec get_abs_time(void)
+static struct timespec get_abs_time(void)
 {
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
   return ts;
 }
 
-uint64_t get_time_delta_us(const struct timespec *start,
-                        const struct timespec *end)
+static uint64_t get_time_delta_us(const struct timespec *start,
+                                  const struct timespec *end)
 {
   uint64_t elapsed;
   elapsed = (((uint64_t)end->tv_sec * NSEC_PER_SEC) + end->tv_nsec);
@@ -135,25 +135,25 @@ uint64_t get_time_delta_us(const struct timespec *start,
   return elapsed / 1000.;
 }
 
-uint64_t get_elapsed_time_us(const struct timespec *start)
+static uint64_t get_elapsed_time_us(const struct timespec *start)
 {
   struct timespec now = get_abs_time();
   return get_time_delta_us(start, &now);
 }
 
-uint64_t time_fsync_us(int fd)
+static uint64_t time_fsync_us(int fd)
 {
   struct timespec start = get_abs_time();
   fsync(fd);
   return get_elapsed_time_us(&start);
 }
 
-float ts_to_kb(uint64_t bytes, uint64_t elapsed)
+static float ts_to_kb(uint64_t bytes, uint64_t elapsed)
 {
   return (bytes / 1024.) / (elapsed / 1e6);
 }
 
-float block_count_to_mb(size_t blocks, size_t block_size)
+static float block_count_to_mb(size_t blocks, size_t block_size)
 {
   return blocks * block_size / (float)(1024 * 1024);
 }
@@ -163,7 +163,8 @@ static const char *print_bool(const bool value)
   return value ? "true" : "false";
 }
 
-void write_test(int fd, sdb_config_t *cfg, uint8_t *block, int block_size)
+static void write_test(int fd, sdb_config_t *cfg, uint8_t *block,
+                       int block_size)
 {
   struct timespec start;
   struct timespec write_start;
@@ -175,7 +176,7 @@ void write_test(int fd, sdb_config_t *cfg, uint8_t *block, int block_size)
   uint64_t elapsed;
   uint64_t total_elapsed = 0.;
   size_t total_blocks = 0;
-  size_t *blocknumber = (unsigned int *)(void *)&block[0];
+  size_t *blocknumber = (size_t *)(void *)&block[0];
 
   printf("\n");
   printf("Testing Sequential Write Speed...\n");
@@ -242,7 +243,8 @@ void write_test(int fd, sdb_config_t *cfg, uint8_t *block, int block_size)
          block_count_to_mb(total_blocks, block_size));
 }
 
-int read_test(int fd, sdb_config_t *cfg, uint8_t *block, int block_size)
+static int read_test(int fd, sdb_config_t *cfg, uint8_t *block,
+                     int block_size)
 {
   uint8_t *read_block;
   uint64_t total_elapsed;
@@ -275,7 +277,7 @@ int read_test(int fd, sdb_config_t *cfg, uint8_t *block, int block_size)
 
   total_elapsed = 0.;
   total_blocks = 0;
-  size_t *blocknumber = (unsigned int *)(void *) &read_block[0];
+  size_t *blocknumber = (size_t *)(void *) &read_block[0];
 
   for (int run = 0; run < cfg->num_runs;  ++run)
     {
@@ -304,8 +306,8 @@ int read_test(int fd, sdb_config_t *cfg, uint8_t *block, int block_size)
 
           if (*blocknumber !=  total_blocks + num_blocks)
             {
-              printf("Read data error at block: %d wrote:0x%04x read:0x%04x",
-                     (total_blocks + num_blocks),
+              printf("Read data error at block: %zu wrote:0x%04zx "
+                     "read:0x%04zx", total_blocks + num_blocks,
                      total_blocks + num_blocks, *blocknumber);
             }
 
@@ -314,7 +316,7 @@ int read_test(int fd, sdb_config_t *cfg, uint8_t *block, int block_size)
             {
               if (block[i] != read_block[i])
                 {
-                  printf("Read data error at offset: %d wrote:0x%02x "
+                  printf("Read data error at offset: %zu wrote:0x%02x "
                          "read:0x%02x", total_blocks + num_blocks + i,
                          block[i], read_block[i]);
                 }
@@ -351,11 +353,11 @@ static void usage(void)
   printf("Test the speed of an SD card or mount point\n");
   printf(CONFIG_TESTING_SD_BENCH_PROGNAME
          ": [-b] [-r] [-d] [-k] [-s] [-a] [-v]\n");
-  printf("  -b   Block size per write (%u-%u), default %u\n",
+  printf("  -b   Block size per write (%zu-%zu), default %zu\n",
          min_block, max_block, default_block);
-  printf("  -r   Number of runs (%u-%u), default %u\n",
+  printf("  -r   Number of runs (%zu-%zu), default %zu\n",
          min_runs, max_runs, default_runs);
-  printf("  -d   Max duration of a test (ms) (%u-%u), default %u\n",
+  printf("  -d   Max duration of a test (ms) (%zu-%zu), default %zu\n",
          min_duration, max_duration, default_duration);
   printf("  -k   Keep test file when finished, default %s\n",
          print_bool(default_keep_test));
@@ -479,7 +481,7 @@ int main(int argc, char *argv[])
       block[j] = (uint8_t)j;
     }
 
-  printf("Using block size = %u bytes, sync = %s\n", block_size,
+  printf("Using block size = %zu bytes, sync = %s\n", block_size,
          print_bool(cfg.synchronized));
 
   write_test(bench_fd, &cfg, block, block_size);

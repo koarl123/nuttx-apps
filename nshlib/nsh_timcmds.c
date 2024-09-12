@@ -95,7 +95,8 @@ static inline int date_month(FAR const char *abbrev)
 
 #ifndef CONFIG_NSH_DISABLE_DATE
 static inline int date_showtime(FAR struct nsh_vtbl_s *vtbl,
-                                FAR const char *name, bool utc)
+                                FAR const char *name, bool utc,
+                                FAR const char *format)
 {
   struct timespec ts;
   struct tm tm;
@@ -132,7 +133,7 @@ static inline int date_showtime(FAR struct nsh_vtbl_s *vtbl,
 
   /* Show the current time in the requested format */
 
-  ret = strftime(timbuf, MAX_TIME_STRING, "%a, %b %d %H:%M:%S %Y", &tm);
+  ret = strftime(timbuf, MAX_TIME_STRING, format, &tm);
   if (ret < 0)
     {
       nsh_error(vtbl, g_fmtcmdfailed, name, "strftime", NSH_ERRNO);
@@ -297,7 +298,8 @@ int cmd_time(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #ifndef CONFIG_NSH_DISABLEBG
   bool bgsave;
 #endif
-  bool redirsave;
+  bool redirsave_out;
+  bool redirsave_in;
   int ret;
 
   /* Get the current time */
@@ -314,7 +316,8 @@ int cmd_time(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #ifndef CONFIG_NSH_DISABLEBG
   bgsave    = vtbl->np.np_bg;
 #endif
-  redirsave = vtbl->np.np_redirect;
+  redirsave_out = vtbl->np.np_redir_out;
+  redirsave_in = vtbl->np.np_redir_in;
 
   /* Execute the command */
 
@@ -353,7 +356,8 @@ int cmd_time(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #ifndef CONFIG_NSH_DISABLEBG
   vtbl->np.np_bg       = bgsave;
 #endif
-  vtbl->np.np_redirect = redirsave;
+  vtbl->np.np_redir_out = redirsave_out;
+  vtbl->np.np_redir_out = redirsave_in;
 
   return ret;
 }
@@ -367,6 +371,7 @@ int cmd_time(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 int cmd_date(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   FAR char *newtime = NULL;
+  FAR const char *format = "%a, %b %d %H:%M:%S %Y";
   FAR const char *errfmt;
   bool utc = false;
   int option;
@@ -395,11 +400,21 @@ int cmd_date(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
         }
     }
 
-  /* optind < argc-1 means that there are additional, unexpected arguments on
+  argc -= optind;
+
+  /* Display the time according to the format we set */
+
+  if (argv[optind] && *argv[optind] == '+')
+    {
+      format = argv[optind] + 1;
+      argc--;
+    }
+
+  /* argc > 0 means that there are additional, unexpected arguments on
    * th command-line
    */
 
-  if (optind < argc)
+  if (argc > 0)
     {
       errfmt = g_fmttoomanyargs;
       goto errout;
@@ -413,7 +428,7 @@ int cmd_date(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
     }
   else
     {
-      ret = date_showtime(vtbl, argv[0], utc);
+      ret = date_showtime(vtbl, argv[0], utc, format);
     }
 
   return ret;
@@ -501,6 +516,7 @@ int cmd_timedatectl(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 
       nsh_output(vtbl, "Universal time: %s %s\n", timbuf, tm.tm_zone);
 
+#ifdef CONFIG_RTC_DRIVER
       ret = open("/dev/rtc0", O_RDONLY);
       if (ret > 0)
         {
@@ -522,6 +538,7 @@ int cmd_timedatectl(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 
           nsh_output(vtbl, "      RTC time: %s\n", timbuf);
         }
+#endif /* CONFIG_RTC_DRIVER */
     }
 
   return ret;

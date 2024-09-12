@@ -97,6 +97,7 @@ static int wapi_bitrate_cmd      (int sock, int argc, FAR char **argv);
 static int wapi_txpower_cmd      (int sock, int argc, FAR char **argv);
 static int wapi_scan_results_cmd (int sock, int argc, FAR char **argv);
 static int wapi_scan_cmd         (int sock, int argc, FAR char **argv);
+static int wapi_pscan_cmd        (int sock, int argc, FAR char **argv);
 static int wapi_country_cmd      (int sock, int argc, FAR char **argv);
 static int wapi_sense_cmd        (int sock, int argc, FAR char **argv);
 #ifdef CONFIG_WIRELESS_WAPI_INITCONF
@@ -104,6 +105,7 @@ static int wapi_reconnect_cmd    (int sock, int argc, FAR char **argv);
 static int wapi_save_config_cmd  (int sock, int argc, FAR char **argv);
 #endif
 static int wapi_pta_prio_cmd     (int sock, int argc, FAR char **argv);
+static int wapi_power_save_cmd   (int sock, int argc, FAR char **argv);
 
 /****************************************************************************
  * Private Data
@@ -114,6 +116,7 @@ static const struct wapi_command_s g_wapi_commands[] =
   {"help",         0, 0, NULL},
   {"show",         1, 1, wapi_show_cmd},
   {"scan",         1, 2, wapi_scan_cmd},
+  {"pscan",        1, 2, wapi_pscan_cmd},
   {"scan_results", 1, 1, wapi_scan_results_cmd},
   {"ip",           2, 2, wapi_ip_cmd},
   {"mask",         2, 2, wapi_mask_cmd},
@@ -132,6 +135,7 @@ static const struct wapi_command_s g_wapi_commands[] =
   {"save_config",  1, 1, wapi_save_config_cmd},
 #endif
   {"pta_prio",     2, 2, wapi_pta_prio_cmd},
+  {"power_save",   2, 2, wapi_power_save_cmd},
 };
 
 /****************************************************************************
@@ -833,7 +837,8 @@ static int wapi_scan_results_cmd(int sock, int argc, FAR char **argv)
  * Name: wapi_scan_cmd
  *
  * Description:
- *   Scans available APs in the range using given ifname interface.
+ *   Use the given ifname interface and active mode to scan the APs
+ *   available in the range.
  *
  * Returned Value:
  *   None
@@ -849,7 +854,37 @@ static int wapi_scan_cmd(int sock, int argc, FAR char **argv)
 
   /* Start scan */
 
-  ret = wapi_scan_init(sock, argv[0], essid);
+  ret = wapi_escan_init(sock, argv[0], IW_SCAN_TYPE_ACTIVE, essid);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
+  return wapi_scan_results_cmd(sock, 1, argv);
+}
+
+/****************************************************************************
+ * Name: wapi_pscan_cmd
+ *
+ * Description:
+ *   Use the given ifname interface and passive mode to scan the APs
+ *   available in the range.
+ *
+ * Returned Value:
+ *   None
+ *
+ ****************************************************************************/
+
+static int wapi_pscan_cmd(int sock, int argc, FAR char **argv)
+{
+  FAR const char *essid;
+  int ret;
+
+  essid = argc > 1 ? argv[1] : NULL;
+
+  /* Start scan */
+
+  ret = wapi_escan_init(sock, argv[0], IW_SCAN_TYPE_PASSIVE, essid);
   if (ret < 0)
     {
       return ret;
@@ -1078,6 +1113,31 @@ static int wapi_pta_prio_cmd(int sock, int argc, FAR char **argv)
 }
 
 /****************************************************************************
+ * Name: wapi_power_save_cmd
+ *
+ * Description:
+ *   Manually configure the power save status.
+ *
+ * Returned Value:
+ *   None
+ *
+ ****************************************************************************/
+
+static int wapi_power_save_cmd(int sock, int argc, FAR char **argv)
+{
+  bool on = false;
+
+  if (strcmp(argv[1], "on") == 0)
+    {
+      on = true;
+    }
+
+  /* Set power save status */
+
+  return wapi_set_power_save(sock, argv[0], on);
+}
+
+/****************************************************************************
  * Name: wapi_showusage
  *
  * Description:
@@ -1095,6 +1155,7 @@ static void wapi_showusage(FAR const char *progname, int exitcode)
   fprintf(stderr, "Usage:\n");
   fprintf(stderr, "\t%s show         <ifname>\n", progname);
   fprintf(stderr, "\t%s scan         <ifname>\n", progname);
+  fprintf(stderr, "\t%s pscan        <ifname>\n", progname);
   fprintf(stderr, "\t%s scan_results <ifname>\n", progname);
   fprintf(stderr, "\t%s ip           <ifname> <IP address>\n", progname);
   fprintf(stderr, "\t%s mask         <ifname> <mask>\n", progname);
@@ -1120,7 +1181,7 @@ static void wapi_showusage(FAR const char *progname, int exitcode)
   fprintf(stderr, "\t%s save_config  <ifname>\n", progname);
 #endif
   fprintf(stderr, "\t%s pta_prio     <ifname>  <index/flag>\n", progname);
-
+  fprintf(stderr, "\t%s power_save   <ifname>  <on|off>\n", progname);
   fprintf(stderr, "\t%s help\n", progname);
 
   fprintf(stderr, "\nFrequency Flags:\n");

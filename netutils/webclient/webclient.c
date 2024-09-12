@@ -428,7 +428,9 @@ static inline int wget_parsestatus(struct webclient_context *ctx,
               DEBUGASSERT(strlen(g_http10) == 8);
               DEBUGASSERT(strlen(g_http11) == 8);
 
-              if (ws->line[8] != ' ')  /* SP before the status-code */
+              /* SP before the status-code */
+
+              if (ws->line[8] != ' ')
                 {
                   return -EINVAL;
                 }
@@ -443,7 +445,9 @@ static inline int wget_parsestatus(struct webclient_context *ctx,
                   return -EINVAL;
                 }
 
-              if (*ep != ' ')  /* SP before reason-phrase */
+              /* SP before reason-phrase */
+
+              if (*ep != ' ')
                 {
                   return -EINVAL;
                 }
@@ -598,7 +602,10 @@ static inline int wget_parseheaders(struct webclient_context *ctx,
            */
 
           found = false;
-          if (ndx > 0) /* Should always be true */
+
+          /* Should always be true */
+
+          if (ndx > 0)
             {
               ninfo("Got HTTP header line%s: %.*s\n",
                     got_nl ? "" : " (truncated)",
@@ -817,7 +824,9 @@ static inline int wget_parsechunkheader(struct webclient_context *ctx,
            * our buffer is already full, so we start parsing it.
            */
 
-          if (ndx > 0) /* Should always be true */
+          /* Should always be true */
+
+          if (ndx > 0)
             {
               FAR char *semicolon;
 
@@ -1596,9 +1605,8 @@ int webclient_perform(FAR struct webclient_context *ctx)
                       /* Could not resolve host (or malformed IP address) */
 
                       nwarn("WARNING: Failed to resolve hostname\n");
-                      free_ws(ws);
-                      _SET_STATE(ctx, WEBCLIENT_CONTEXT_STATE_DONE);
-                      return -EHOSTUNREACH;
+                      ret = -EHOSTUNREACH;
+                      goto errout_with_errno;
                     }
 
                   server_address = (const struct sockaddr *)&server_in;

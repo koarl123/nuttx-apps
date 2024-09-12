@@ -64,6 +64,25 @@ $(INCDIR): $(TOPDIR)/tools/incdir.c
 
 IMPORT_TOOLS = $(MKDEP) $(INCDIR)
 
+ifeq ($(CONFIG_TOOLS_WASM_BUILD),y)
+
+configure_wasm:
+	$(Q) cmake -B$(APPDIR)$(DELIM)tools$(DELIM)Wasm$(DELIM)build \
+		$(APPDIR)$(DELIM)tools$(DELIM)Wasm \
+		-DAPPDIR=$(APPDIR) -DTOPDIR=$(TOPDIR) \
+		-DWASI_SDK_PATH=$(WASI_SDK_PATH) \
+		-DKCONFIG_FILE_PATH=$(TOPDIR)$(DELIM).config
+
+context_wasm: configure_wasm
+	$(Q) cmake --build $(APPDIR)$(DELIM)tools$(DELIM)Wasm$(DELIM)build
+
+else
+
+context_wasm:
+
+endif
+
+
 # In the KERNEL build, we must build and install all of the modules.  No
 # symbol table is needed
 
@@ -103,8 +122,13 @@ $(SYMTABSRC): $(foreach SDIR, $(CONFIGURED_APPS), $(SDIR)_all)
 	$(Q) $(APPDIR)$(DELIM)tools$(DELIM)mksymtab.sh $(BINDIR) >$@.tmp
 	$(Q) $(call TESTANDREPLACEFILE, $@.tmp, $@)
 
+ifneq ($(CONFIG_ARM_TOOLCHAIN_GHS),y)
 $(SYMTABOBJ): %$(OBJEXT): %.c
 	$(call COMPILE, $<, $@, -fno-lto -fno-builtin)
+else
+$(SYMTABOBJ): %$(OBJEXT): %.c
+	$(call COMPILE, $<, $@, -Onolink)
+endif
 
 $(BIN): $(SYMTABOBJ)
 	$(call ARLOCK, $(call CONVERT_PATH,$(BIN)), $^)
@@ -155,6 +179,7 @@ staging:
 context: | staging
 	$(Q) $(MAKE) context_all
 	$(Q) $(MAKE) register_all
+	$(Q) $(MAKE) context_wasm
 
 Kconfig:
 	$(foreach SDIR, $(CONFIGDIRS), $(call MAKE_template,$(SDIR),preconfig))
@@ -205,4 +230,5 @@ distclean: $(foreach SDIR, $(CLEANDIRS), $(SDIR)_distclean)
 	$(call DELDIR, $(BINDIR))
 	$(call DELDIR, staging)
 	$(call DELDIR, wasm)
+	$(call DELDIR, $(APPDIR)$(DELIM)tools$(DELIM)Wasm$(DELIM)build)
 	$(call CLEAN)

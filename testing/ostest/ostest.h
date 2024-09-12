@@ -91,6 +91,10 @@
 
 int getopt_test(void);
 
+/* libc_memmem.c ************************************************************/
+
+int memmem_test(void);
+
 /* setvbuf.c ****************************************************************/
 
 #ifndef CONFIG_STDIO_DISABLE_BUFFERING
@@ -282,6 +286,12 @@ int sem_nfreeholders(void);
 #else
 #  define sem_enumholders(sem)
 #  define sem_nfreeholders()
+#endif
+
+/* nxevent.c ****************************************************************/
+
+#if defined(CONFIG_SCHED_EVENTS) && defined(CONFIG_BUILD_FLAT)
+void nxevent_test(void);
 #endif
 
 #endif /* __APPS_TESTING_OSTEST_OSTEST_H */

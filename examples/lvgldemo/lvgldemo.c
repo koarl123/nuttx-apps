@@ -23,20 +23,13 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
-
-#include <sys/boardctl.h>
-#include <sys/param.h>
 #include <unistd.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <time.h>
-#include <debug.h>
+#include <sys/boardctl.h>
 
 #include <lvgl/lvgl.h>
-#include <port/lv_port.h>
 #include <lvgl/demos/lv_demos.h>
-#ifdef CONFIG_LIBUV
+
+#ifdef CONFIG_LV_USE_NUTTX_LIBUV
 #  include <uv.h>
 #  include <port/lv_port_libuv.h>
 #endif
@@ -44,7 +37,7 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-/* Should we perform board-specific driver initialization?  There are two
+/* Should we perform board-specific driver initialization? There are two
  * ways that board initialization can occur:  1) automatically via
  * board_late_initialize() during bootupif CONFIG_BOARD_LATE_INITIALIZE
  * or 2).
@@ -188,7 +181,7 @@ static demo_create_func_t find_demo_create_func(FAR const char *name)
  ****************************************************************************/
 
 /****************************************************************************
- * Name: main or lvgldemo_main
+ * Name: main or lv_demos_main
  *
  * Description:
  *
@@ -202,68 +195,48 @@ static demo_create_func_t find_demo_create_func(FAR const char *name)
 
 int main(int argc, FAR char *argv[])
 {
-  demo_create_func_t demo_create_func;
-  FAR const char *demo = NULL;
-  const int func_key_pair_len = nitems(func_key_pair);
+  lv_nuttx_dsc_t info;
+  lv_nuttx_result_t result;
 
-#ifdef CONFIG_LIBUV
+#ifdef CONFIG_LV_USE_NUTTX_LIBUV
   uv_loop_t ui_loop;
+  lv_memzero(&ui_loop, sizeof(ui_loop));
 #endif
-
-  /* If no arguments are specified and only 1 demo exists, select the demo */
-
-  if (argc == 1 && func_key_pair_len == 2)  /* 2 because of NULL sentinel */
-    {
-      demo = func_key_pair[0].name;
-    }
-  else if (argc != 2)
-    {
-      show_usage();
-      return EXIT_FAILURE;
-    }
-  else
-    {
-      demo = argv[1];
-    }
-
-  demo_create_func = find_demo_create_func(demo);
-
-  if (demo_create_func == NULL)
-    {
-      show_usage();
-      return EXIT_FAILURE;
-    }
 
 #ifdef NEED_BOARDINIT
   /* Perform board-specific driver initialization */
 
   boardctl(BOARDIOC_INIT, 0);
 
-#ifdef CONFIG_BOARDCTL_FINALINIT
-  /* Perform architecture-specific final-initialization (if configured) */
-
-  boardctl(BOARDIOC_FINALINIT, 0);
 #endif
-#endif
-
-  /* LVGL initialization */
 
   lv_init();
 
-  /* LVGL port initialization */
+  lv_nuttx_dsc_init(&info);
 
-  lv_port_init();
+#ifdef CONFIG_LV_USE_NUTTX_LCD
+  info.fb_path = "/dev/lcd0";
+#endif
 
-  /* LVGL demo creation */
+  lv_nuttx_init(&info, &result);
 
-  demo_create_func();
+  if (result.disp == NULL)
+    {
+      LV_LOG_ERROR("lv_demos initialization failure!");
+      return 1;
+    }
 
-  /* Handle LVGL tasks */
+  if (!lv_demos_create(&argv[1], argc - 1))
+    {
+      lv_demos_show_help();
 
-#ifdef CONFIG_LIBUV
-  uv_loop_init(&ui_loop);
-  lv_port_libuv_init(&ui_loop);
-  uv_run(&ui_loop, UV_RUN_DEFAULT);
+      /* we can add custom demos here */
+
+      goto demo_end;
+    }
+
+#ifdef CONFIG_LV_USE_NUTTX_LIBUV
+  lv_nuttx_uv_loop(&ui_loop, &result);
 #else
   while (1)
     {
@@ -277,5 +250,9 @@ int main(int argc, FAR char *argv[])
     }
 #endif
 
-  return EXIT_SUCCESS;
+demo_end:
+  lv_disp_remove(result.disp);
+  lv_deinit();
+
+  return 0;
 }

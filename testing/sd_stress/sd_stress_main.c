@@ -65,17 +65,17 @@ static const char *TEMPDIR = CONFIG_TESTING_SD_STRESS_DEVICE"/stress";
 static const char *TEMPDIR2 = CONFIG_TESTING_SD_STRESS_DEVICE"/moved";
 static const char *TEMPFILE = "tmp";
 
-const size_t max_runs = 10000;
-const size_t min_runs = 1;
-const size_t default_runs = 32;
+static const size_t max_runs = 10000;
+static const size_t min_runs = 1;
+static const size_t default_runs = 32;
 
-const size_t max_bytes = 10000;
-const size_t min_bytes = 1;
-const size_t default_bytes = 4096;
+static const size_t max_bytes = 10000;
+static const size_t min_bytes = 1;
+static const size_t default_bytes = 4096;
 
-const size_t max_files = 999;
-const size_t min_files = 1;
-const size_t default_files = 64;
+static const size_t max_files = 999;
+static const size_t min_files = 1;
+static const size_t default_files = 64;
 
 /****************************************************************************
  * Private Functions
@@ -85,11 +85,11 @@ static void usage(void)
 {
   printf("Stress test on a mount point\n");
   printf(CONFIG_TESTING_SD_STRESS_PROGNAME ": [-r] [-b] [-f]\n");
-  printf("  -r   Number of runs (%u-%u), default %u\n",
+  printf("  -r   Number of runs (%zu-%zu), default %zu\n",
          min_runs, max_runs, default_runs);
-  printf("  -b   Number of bytes (%u-%u), default %u\n",
+  printf("  -b   Number of bytes (%zu-%zu), default %zu\n",
          min_bytes, max_bytes, default_bytes);
-  printf("  -f   Number of files (%u-%u), default %u\n",
+  printf("  -f   Number of files (%zu-%zu), default %zu\n",
          min_files, max_files, default_files);
 }
 
@@ -150,7 +150,7 @@ static bool create_files(const char *dir, const char *name,
   for (size_t i = 0; i < num_files; ++i)
     {
       char path[MAX_PATH_LEN];
-      snprintf(path, MAX_PATH_LEN, "%s/%s%03u", dir, name, i);
+      snprintf(path, MAX_PATH_LEN, "%s/%s%03zu", dir, name, i);
 
       memset(read_bytes, 0x0, num_bytes);
 
@@ -243,7 +243,7 @@ static bool remove_files(const char *dir, const char *name,
   for (size_t i = 0; i < num_files; ++i)
     {
       char path[MAX_PATH_LEN];
-      snprintf(path, MAX_PATH_LEN, "%s/%s%03u", dir, name, i);
+      snprintf(path, MAX_PATH_LEN, "%s/%s%03zu", dir, name, i);
 
       int ret = unlink(path);
 
@@ -272,15 +272,15 @@ static bool rename_dir(const char *old_dir, const char *new_dir)
   return true;
 }
 
-struct timespec get_abs_time(void)
+static struct timespec get_abs_time(void)
 {
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
   return ts;
 }
 
-uint64_t get_time_delta(const struct timespec *start,
-                        const struct timespec *end)
+static uint64_t get_time_delta(const struct timespec *start,
+                               const struct timespec *end)
 {
   uint64_t elapsed;
   elapsed = (((uint64_t)end->tv_sec * NSEC_PER_SEC) + end->tv_nsec);
@@ -288,7 +288,7 @@ uint64_t get_time_delta(const struct timespec *start,
   return elapsed / 1000;
 }
 
-float get_elapsed_time_ms(const struct timespec *start)
+static float get_elapsed_time_ms(const struct timespec *start)
 {
   struct timespec now = get_abs_time();
   return get_time_delta(start, &now) / (float)USEC_PER_MSEC;
@@ -354,7 +354,7 @@ int main(int argc, char *argv[])
       exit(EXIT_FAILURE);
     }
 
-  printf("Start stress test with %u files, %u bytes and %u iterations.\n",
+  printf("Start stress test with %zu files, %zu bytes and %zu iterations.\n",
          num_files, num_bytes, num_runs);
 
   bytes = (char *)malloc(num_bytes);
@@ -386,7 +386,7 @@ int main(int argc, char *argv[])
 
       elapsed_time = get_elapsed_time_ms(&start);
       total_time += elapsed_time;
-      printf("iteration %u took %.3f ms: %s\n", i,
+      printf("iteration %zu took %.3f ms: %s\n", i,
              elapsed_time, result ? "OK" : "FAIL");
 
       if (!result)

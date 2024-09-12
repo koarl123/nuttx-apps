@@ -66,7 +66,31 @@ config NSH_PROMPT_STRING
 	string "Prompt String"
 	default "nsh> "
 	---help---
-		Provide the shell prompt string, default is "nsh> ".
+		Provide the shell prompt string with size limit NSH_PROMPT_MAX.
+		default is "nsh> ".
+
+config NSH_PROMPT_MAX
+	int "Maximum Size of Prompt String"
+	default NAME_MAX
+	---help---
+		The maximum size of shell prompt string, including ending null.
+
+config NSH_PROMPT_ENV
+	string "Prompt String Environment Variable"
+	default "PS1"
+	depends on !DISABLE_ENVIRON
+	---help---
+		The environment variable name containing prompt string.
+		Only used when NSH_PROMPT_STRING is empty.
+
+config NSH_PROMPT_SUFFIX
+	string "Suffix used to derive fallback prompt string"
+	default "> "
+	---help---
+		When NSH_PROMPT_STRING is empty, the environment variable defined
+		by NSH_PROMPT_ENV or hostname will be used to derive the prompt
+		at runtime. This suffix is a part of the final prompt that serves
+		to clearly separate prompt from user inputs.
 
 config NSH_DISABLE_ECHOBACK
 	bool "Disable echoback"
@@ -359,6 +383,10 @@ config NSH_DISABLE_EXIT
 	bool "Disable exit"
 	default DEFAULT_SMALL && !NSH_TELNET
 
+config NSH_DISABLE_EXPR
+	bool "Disable expr"
+	default DEFAULT_SMALL
+
 config NSH_DISABLE_EXPORT
 	bool "Disable export"
 	default DEFAULT_SMALL
@@ -378,7 +406,7 @@ config NSH_DISABLE_GET
 
 config NSH_DISABLE_HELP
 	bool "Disable help"
-	default DEFAULT_SMALL
+	default n
 
 config NSH_DISABLE_ERROR_PRINT
 	bool "Disable NSH Error Printing"
@@ -565,10 +593,15 @@ config NSH_DISABLE_ROUTE
 	depends on FS_PROCFS && NET_ROUTE && !FS_PROCFS_EXCLUDE_NET && !FS_PROCFS_EXCLUDE_ROUTE
 	default DEFAULT_SMALL
 
+config NSH_DISABLE_RPMSG
+	bool "Disable rpmsg"
+	default DEFAULT_SMALL
+	depends on RPMSG
+
 config NSH_DISABLE_RPTUN
 	bool "Disable rptun"
 	default DEFAULT_SMALL
-	depends on RPTUN
+	depends on RPTUN && !NSH_DISABLE_RPMSG
 
 config NSH_DISABLE_SET
 	bool "Disable set"
@@ -655,6 +688,11 @@ config NSH_DISABLE_RESET_CAUSE
 	bool "Disable reset cause"
 	default DEFAULT_SMALL
 	depends on BOARDCTL_RESET_CAUSE
+
+config NSH_DISABLE_IRQ_AFFINITY
+	bool "Disable command of irq affinity"
+	default DEFAULT_SMALL
+	depends on BOARDCTL_IRQ_AFFINITY
 
 endmenu
 

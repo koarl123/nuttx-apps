@@ -1,5 +1,5 @@
 ############################################################################
-# apps/testing/cpuload/Make.defs
+# apps/testing/cpuload/Makefile
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -21,7 +21,7 @@
 include $(APPDIR)/Make.defs
 
 PROGNAME  = cpuload
-PRIORITY  = 100
+PRIORITY  = 253
 STACKSIZE = $(CONFIG_DEFAULT_TASK_STACKSIZE)
 MODULE    = $(CONFIG_TESTING_CPULOAD)
 

@@ -97,6 +97,237 @@
  ****************************************************************************/
 
 /****************************************************************************
+ * Name: cp_handler
+ ****************************************************************************/
+
+#ifndef CONFIG_NSH_DISABLE_CP
+static int cp_handler(FAR struct nsh_vtbl_s *vtbl, FAR const char *srcpath,
+                      FAR const char *destpath)
+{
+  struct stat buf;
+  FAR char *allocpath = NULL;
+  int oflags = O_WRONLY | O_CREAT | O_TRUNC;
+  int rdfd;
+  int wrfd;
+  int ret = ERROR;
+
+  rdfd = open(srcpath, O_RDONLY);
+  if (rdfd < 0)
+    {
+      nsh_error(vtbl, g_fmtcmdfailed, "cp", "open_rdfd", NSH_ERRNO);
+      return ret;
+    }
+
+  /* Check if the destination is a directory */
+
+  if (stat(destpath, &buf) == 0)
+    {
+      /* Something exists here... is it a directory? */
+
+      if (S_ISDIR(buf.st_mode))
+        {
+          /* Yes, it is a directory.
+           * Remove any trailing '/' characters from the path
+           */
+
+          nsh_trimdir((FAR char *)destpath);
+
+          /* Construct the full path to the new file */
+
+          allocpath = nsh_getdirpath(vtbl, destpath,
+                      basename((FAR char *)srcpath));
+          if (!allocpath)
+            {
+              nsh_error(vtbl, g_fmtcmdoutofmemory, "cp");
+              goto errout_with_rdfd;
+            }
+
+          /* Open then dest for writing */
+
+          destpath = allocpath;
+        }
+      else if (!S_ISREG(buf.st_mode))
+        {
+          /* Maybe it is a driver? */
+
+          oflags = O_WRONLY;
+        }
+    }
+
+  wrfd = open(destpath, oflags, 0666);
+  if (wrfd < 0)
+    {
+      nsh_error(vtbl, g_fmtcmdfailed, "cp", "open_wrfd", NSH_ERRNO);
+      goto errout_with_allocpath;
+    }
+
+  for (; ; )
+    {
+      ssize_t nbyteswritten;
+      ssize_t nbytesread;
+      FAR char *iobuffer = vtbl->iobuffer;
+
+      nbytesread = read(rdfd, iobuffer, IOBUFFERSIZE);
+      if (nbytesread == 0)
+        {
+          /* End of file */
+
+          ret = OK;
+          goto errout_with_wrfd;
+        }
+      else if (nbytesread < 0)
+        {
+          /* EINTR is not an error (but will still stop the copy) */
+
+          if (errno == EINTR)
+            {
+              nsh_error(vtbl, g_fmtsignalrecvd, "cp");
+            }
+          else
+            {
+              /* Read error */
+
+              nsh_error(vtbl, g_fmtcmdfailed, "cp", "read",
+                        NSH_ERRNO);
+            }
+
+          goto errout_with_wrfd;
+        }
+
+      do
+        {
+          nbyteswritten = write(wrfd, iobuffer, nbytesread);
+          if (nbyteswritten >= 0)
+            {
+              nbytesread -= nbyteswritten;
+              iobuffer += nbyteswritten;
+            }
+          else
+            {
+              /* EINTR is not an error (but will still stop the copy) */
+
+              if (errno == EINTR)
+                {
+                  nsh_error(vtbl, g_fmtsignalrecvd, "cp");
+                }
+              else
+                {
+                  /* Read error */
+
+                  nsh_error(vtbl, g_fmtcmdfailed, "cp", "write",
+                            NSH_ERRNO);
+                }
+
+              goto errout_with_wrfd;
+            }
+        }
+      while (nbytesread > 0);
+    }
+
+errout_with_wrfd:
+  close(wrfd);
+
+errout_with_allocpath:
+  free(allocpath);
+
+errout_with_rdfd:
+  close(rdfd);
+
+  return ret;
+}
+#endif
+
+/****************************************************************************
+ * Name: cp_recursive
+ ****************************************************************************/
+
+#ifndef CONFIG_NSH_DISABLE_CP
+static int cp_recursive(FAR struct nsh_vtbl_s *vtbl, FAR const char *srcpath,
+                        FAR const char *destpath)
+{
+  FAR struct dirent *entry;
+  FAR char *allocdestpath;
+  FAR char *allocsrcpath;
+  struct stat buf;
+  int ret = OK;
+  DIR *dp;
+
+  dp = opendir(srcpath);
+  if (dp == NULL)
+    {
+      nsh_error(vtbl, g_fmtcmdfailed, "cp", "opendir", NSH_ERRNO);
+      return ERROR;
+    }
+
+  while ((entry = readdir(dp)) != NULL && ret == OK)
+    {
+      if (strcmp(entry->d_name, ".") == 0 ||
+          strcmp(entry->d_name, "..") == 0)
+        {
+          continue;
+        }
+
+      allocsrcpath = nsh_getdirpath(vtbl, srcpath, entry->d_name);
+      if (allocsrcpath == NULL)
+        {
+          ret = ERROR;
+          continue;
+        }
+
+      ret = stat(allocsrcpath, &buf);
+      if (ret != OK)
+        {
+          nsh_error(vtbl, g_fmtcmdfailed, "cp", "stat", NSH_ERRNO);
+          goto errout_with_allocsrcpath;
+        }
+
+      allocdestpath = nsh_getdirpath(vtbl, destpath, entry->d_name);
+      if (allocdestpath == NULL)
+        {
+          ret = ERROR;
+          goto errout_with_allocsrcpath;
+        }
+
+      if (S_ISDIR(buf.st_mode))
+        {
+#if !defined(CONFIG_DISABLE_MOUNTPOINT) || !defined(CONFIG_DISABLE_PSEUDOFS_OPERATIONS)
+          ret = mkdir(allocdestpath, S_IRWXU | S_IRWXG | S_IROTH |
+                      S_IXOTH);
+          if (ret != OK)
+            {
+              nsh_error(vtbl, g_fmtcmdfailed, "cp", "mkdir", NSH_ERRNO);
+              goto errout_with_allocdestpath;
+            }
+#endif
+
+          ret = cp_recursive(vtbl, allocsrcpath, allocdestpath);
+          if (ret != OK)
+            {
+              goto errout_with_allocdestpath;
+            }
+        }
+      else
+        {
+          ret = cp_handler(vtbl, allocsrcpath, allocdestpath);
+          if (ret != OK)
+            {
+              goto errout_with_allocdestpath;
+            }
+        }
+
+errout_with_allocdestpath:
+      free(allocdestpath);
+
+errout_with_allocsrcpath:
+      free(allocsrcpath);
+    }
+
+  closedir(dp);
+  return ret;
+}
+#endif
+
+/****************************************************************************
  * Name: ls_specialdir
  ****************************************************************************/
 
@@ -182,7 +413,7 @@ static int ls_handler(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
               details[0] = 'f';
             }
 #endif
-#ifdef CONFIG_FS_SHM
+#ifdef CONFIG_FS_SHMFS
           else if (S_ISSHM(buf.st_mode))
             {
               details[0] = 'h';
@@ -560,6 +791,25 @@ int cmd_cat(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
         }
     }
 
+  if (argc == 1)
+    {
+      char *buf = malloc(BUFSIZ);
+
+      /* Dump from input */
+
+      while (true)
+        {
+          ssize_t n = nsh_read(vtbl, buf, BUFSIZ);
+
+          if (n == 0)
+            break;
+
+          nsh_write(vtbl, buf, n);
+        }
+
+      free(buf);
+    }
+
   return ret;
 }
 #endif
@@ -618,79 +868,38 @@ int cmd_dmesg(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #ifndef CONFIG_NSH_DISABLE_CP
 int cmd_cp(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
-  UNUSED(argc);
-
-  struct stat buf;
   FAR char *srcpath  = NULL;
   FAR char *destpath = NULL;
-  FAR char *allocpath = NULL;
-  int oflags = O_WRONLY | O_CREAT | O_TRUNC;
-  int rdfd;
-  int wrfd;
+  bool recursive = false;
   int ret = ERROR;
+  int option;
+
+  /* Get the cp flags */
+
+  while ((option = getopt(argc, argv, "r")) != ERROR)
+    {
+      switch (option)
+        {
+          case 'r':
+            recursive = true;
+            break;
+        }
+    }
 
   /* Get the full path to the source file */
 
-  srcpath = nsh_getfullpath(vtbl, argv[1]);
+  srcpath = nsh_getfullpath(vtbl, argv[optind]);
   if (srcpath == NULL)
     {
       nsh_error(vtbl, g_fmtcmdoutofmemory, argv[0]);
       goto errout;
     }
 
-  /* Open the source file for reading */
-
-  rdfd = open(srcpath, O_RDONLY);
-  if (rdfd < 0)
-    {
-      nsh_error(vtbl, g_fmtcmdfailed, argv[0], "open", NSH_ERRNO);
-      goto errout_with_srcpath;
-    }
-
-  /* Get the full path to the destination file or directory */
-
-  destpath = nsh_getfullpath(vtbl, argv[2]);
+  destpath = nsh_getfullpath(vtbl, argv[optind + 1]);
   if (destpath == NULL)
     {
       nsh_error(vtbl, g_fmtcmdoutofmemory, argv[0]);
-      goto errout_with_rdfd;
-    }
-
-  /* Check if the destination is a directory */
-
-  ret = stat(destpath, &buf);
-  if (ret == 0)
-    {
-      /* Something exists here... is it a directory? */
-
-      if (S_ISDIR(buf.st_mode))
-        {
-          /* Yes, it is a directory.
-           * Remove any trailing '/' characters from the path
-           */
-
-          nsh_trimdir(destpath);
-
-          /* Construct the full path to the new file */
-
-          allocpath = nsh_getdirpath(vtbl, destpath, basename(argv[1]));
-          if (!allocpath)
-            {
-              nsh_error(vtbl, g_fmtcmdoutofmemory, argv[0]);
-              goto errout_with_destpath;
-            }
-
-          /* Open then dest for writing */
-
-          nsh_freefullpath(destpath);
-          destpath = allocpath;
-        }
-      else if (!S_ISREG(buf.st_mode))
-        {
-          /* Maybe it is a driver? */
-
-          oflags = O_WRONLY;
-        }
+      goto errout_with_srcpath;
     }
 
   /* Check if the destination does not match the source */
@@ -698,110 +907,25 @@ int cmd_cp(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
   if (strcmp(destpath, srcpath) == 0)
     {
       nsh_error(vtbl, g_fmtsyntax, argv[0]);
-      goto errout_with_allocpath;
+      goto errout_with_destpath;
     }
 
   /* Now open the destination */
 
-  wrfd = open(destpath, oflags, 0666);
-  if (wrfd < 0)
+  if (recursive)
     {
-      nsh_error(vtbl, g_fmtcmdfailed, argv[0], "open", NSH_ERRNO);
-      goto errout_with_allocpath;
+      ret = cp_recursive(vtbl, srcpath, destpath);
     }
-
-  /* Now copy the file */
-
-  for (; ; )
+  else
     {
-      int nbytesread;
-      int nbyteswritten;
-      FAR char *iobuffer = vtbl->iobuffer;
-
-      do
-        {
-          nbytesread = read(rdfd, iobuffer, IOBUFFERSIZE);
-          if (nbytesread == 0)
-            {
-              /* End of file */
-
-              ret = OK;
-              goto errout_with_wrfd;
-            }
-          else if (nbytesread < 0)
-            {
-              /* EINTR is not an error (but will still stop the copy) */
-
-              if (errno == EINTR)
-                {
-                  nsh_error(vtbl, g_fmtsignalrecvd, argv[0]);
-                }
-              else
-                {
-                  /* Read error */
-
-                  nsh_error(vtbl, g_fmtcmdfailed, argv[0], "read",
-                            NSH_ERRNO);
-                }
-
-              goto errout_with_wrfd;
-            }
-        }
-      while (nbytesread <= 0);
-
-      do
-        {
-          nbyteswritten = write(wrfd, iobuffer, nbytesread);
-          if (nbyteswritten >= 0)
-            {
-              nbytesread -= nbyteswritten;
-              iobuffer += nbyteswritten;
-            }
-          else
-            {
-              /* EINTR is not an error (but will still stop the copy) */
-
-              if (errno == EINTR)
-                {
-                  nsh_error(vtbl, g_fmtsignalrecvd, argv[0]);
-                }
-              else
-                {
-                  /* Read error */
-
-                  nsh_error(vtbl, g_fmtcmdfailed, argv[0], "write",
-                            NSH_ERRNO);
-                }
-
-              goto errout_with_wrfd;
-            }
-        }
-      while (nbytesread > 0);
-    }
-
-errout_with_wrfd:
-  close(wrfd);
-
-errout_with_allocpath:
-  if (allocpath)
-    {
-      free(allocpath);
+      ret = cp_handler(vtbl, srcpath, destpath);
     }
 
 errout_with_destpath:
-  if (destpath && !allocpath)
-    {
-      nsh_freefullpath(destpath);
-    }
-
-errout_with_rdfd:
-  close(rdfd);
+  nsh_freefullpath(destpath);
 
 errout_with_srcpath:
-  if (srcpath)
-    {
-      nsh_freefullpath(srcpath);
-    }
+  nsh_freefullpath(srcpath);
 
 errout:
   return ret;
@@ -1996,21 +2120,20 @@ int cmd_readlink(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #ifdef NSH_HAVE_DIROPTS
 #ifndef CONFIG_NSH_DISABLE_RM
 
-static int unlink_recursive(FAR char *path)
+static int unlink_recursive(FAR char *path, FAR struct stat *stat)
 {
   struct dirent *d;
-  struct stat stat;
   size_t len;
   int ret;
   DIR *dp;
 
-  ret = lstat(path, &stat);
+  ret = lstat(path, stat);
   if (ret < 0)
     {
       return ret;
     }
 
-  if (!S_ISDIR(stat.st_mode))
+  if (!S_ISDIR(stat->st_mode))
     {
       return unlink(path);
     }
@@ -2035,7 +2158,7 @@ static int unlink_recursive(FAR char *path)
         }
 
       snprintf(&path[len], PATH_MAX - len, "/%s", d->d_name);
-      ret = unlink_recursive(path);
+      ret = unlink_recursive(path, stat);
       if (ret < 0)
         {
           closedir(dp);
@@ -2058,6 +2181,7 @@ int cmd_rm(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
   bool recursive = (strcmp(argv[1], "-r") == 0);
   FAR char *fullpath;
   char buf[PATH_MAX];
+  struct stat stat;
   int ret = ERROR;
 
   if (recursive && argc == 2)
@@ -2073,7 +2197,7 @@ int cmd_rm(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
       if (recursive)
         {
           strlcpy(buf, fullpath, PATH_MAX);
-          ret = unlink_recursive(buf);
+          ret = unlink_recursive(buf, &stat);
         }
       else
         {

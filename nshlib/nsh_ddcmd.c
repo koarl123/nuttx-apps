@@ -75,6 +75,7 @@ struct dd_s
   int          outfd;      /* File descriptor of the output device */
   uint32_t     nsectors;   /* Number of sectors to transfer */
   uint32_t     skip;       /* The number of sectors skipped on input */
+  uint32_t     seek;       /* The number of bytes skipped on output */
   bool         eof;        /* true: The end of the input or output file has been hit */
   bool         verify;     /* true: Verify infile and outfile correctness */
   size_t       sectsize;   /* Size of one sector */
@@ -184,6 +185,7 @@ static inline int dd_outfopen(FAR const char *name, FAR struct dd_s *dd)
 static int dd_verify(FAR const char *infile, FAR const char *outfile,
                      FAR struct dd_s *dd)
 {
+  FAR struct nsh_vtbl_s *vtbl = dd->vtbl;
   FAR uint8_t *buffer;
   unsigned sector = 0;
   int ret = OK;
@@ -194,7 +196,7 @@ static int dd_verify(FAR const char *infile, FAR const char *outfile,
   ret = lseek(dd->infd, dd->skip ? dd->skip * dd->sectsize : 0, SEEK_SET);
   if (ret < 0)
     {
-      nsh_error(dd->vtbl, g_fmtcmdfailed, g_dd, "lseek", NSH_ERRNO);
+      nsh_error(vtbl, g_fmtcmdfailed, g_dd, "lseek", NSH_ERRNO);
       return ret;
     }
 
@@ -202,7 +204,7 @@ static int dd_verify(FAR const char *infile, FAR const char *outfile,
   ret = lseek(dd->outfd, 0, SEEK_SET);
   if (ret < 0)
     {
-      nsh_error(dd->vtbl, g_fmtcmdfailed, g_dd, "lseek", NSH_ERRNO);
+      nsh_error(vtbl, g_fmtcmdfailed, g_dd, "lseek", NSH_ERRNO);
       return ret;
     }
 
@@ -223,7 +225,7 @@ static int dd_verify(FAR const char *infile, FAR const char *outfile,
       ret = read(dd->outfd, buffer, dd->nbytes);
       if (ret != dd->nbytes)
         {
-          nsh_error(dd->vtbl, g_fmtcmdfailed, g_dd, "read", NSH_ERRNO);
+          nsh_error(vtbl, g_fmtcmdfailed, g_dd, "read", NSH_ERRNO);
           break;
         }
 
@@ -231,10 +233,10 @@ static int dd_verify(FAR const char *infile, FAR const char *outfile,
         {
           char msg[32];
           snprintf(msg, sizeof(msg), "infile sector %d", sector);
-          nsh_dumpbuffer(dd->vtbl, msg, dd->buffer, dd->nbytes);
+          nsh_dumpbuffer(vtbl, msg, dd->buffer, dd->nbytes);
           snprintf(msg, sizeof(msg), "\noutfile sector %d", sector);
-          nsh_dumpbuffer(dd->vtbl, msg, buffer, dd->nbytes);
-          nsh_output(dd->vtbl, "\n");
+          nsh_dumpbuffer(vtbl, msg, buffer, dd->nbytes);
+          nsh_output(vtbl, "\n");
           ret = ERROR;
           break;
         }
@@ -244,7 +246,7 @@ static int dd_verify(FAR const char *infile, FAR const char *outfile,
 
   if (ret < 0)
     {
-      nsh_error(dd->vtbl, g_fmtcmdfailed, g_dd, "dd_verify", ret);
+      nsh_error(vtbl, g_fmtcmdfailed, g_dd, "dd_verify", ret);
     }
 
   free(buffer);
@@ -331,6 +333,10 @@ int cmd_dd(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
         {
           dd.skip = atoi(&argv[i][5]);
         }
+      else if (strncmp(argv[i], "seek=", 5) == 0)
+        {
+          dd.seek = atoi(&argv[i][5]);
+        }
       else if (strncmp(argv[i], "verify", 6) == 0)
         {
           dd.verify = true;
@@ -379,9 +385,20 @@ int cmd_dd(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
   if (dd.skip)
     {
       ret = lseek(dd.infd, dd.skip * dd.sectsize, SEEK_SET);
-      if (ret < -1)
+      if (ret < 0)
         {
-          nsh_error(vtbl, g_fmtcmdfailed, g_dd, "lseek", NSH_ERRNO);
+          nsh_error(vtbl, g_fmtcmdfailed, g_dd, "skip lseek", NSH_ERRNO);
+          ret = ERROR;
+          goto errout_with_outf;
+        }
+    }
+
+  if (dd.seek)
+    {
+      ret = lseek(dd.outfd, dd.seek * dd.sectsize, SEEK_SET);
+      if (ret < 0)
+        {
+          nsh_error(vtbl, g_fmtcmdfailed, g_dd, "seek lseek", NSH_ERRNO);
           ret = ERROR;
           goto errout_with_outf;
         }
@@ -426,8 +443,8 @@ int cmd_dd(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 
   total = ((uint64_t)sector * (uint64_t)dd.sectsize);
 
-  nsh_output(vtbl, "%llu bytes copied, %u usec, ",
-             total, (unsigned int)elapsed);
+  nsh_output(vtbl, "%" PRIu64 "bytes copied, %" PRIu64 " usec, ",
+             total, elapsed);
   nsh_output(vtbl, "%u KB/s\n" ,
              (unsigned int)(((double)total / 1024)
              / ((double)elapsed / USEC_PER_SEC)));

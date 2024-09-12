@@ -123,9 +123,21 @@ MAINSRC  += drivertest_regulator.c
 PROGNAME += cmocka_driver_regulator
 endif
 
-ifneq ($(CONFIG_LV_USE_TOUCHPAD_INTERFACE),)
+ifneq ($(CONFIG_LV_USE_NUTTX_TOUCHSCREEN),)
 MAINSRC  += drivertest_touchpanel.c
 PROGNAME += cmocka_driver_touchpanel
+endif
+
+ifeq ($(CONFIG_ARCH_CHIP_MPS2_AN500),y)
+ifeq ($(CONFIG_ARCH_IRQPRIO),y)
+MAINSRC  += drivertest_mps2.c
+PROGNAME += cmocka_driver_mps2
+endif
+endif
+
+ifneq ($(CONFIG_PM),)
+MAINSRC  += drivertest_pm.c
+PROGNAME += cmocka_driver_pm
 endif
 
 ifneq ($(CONFIG_PM_RUNTIME),)
