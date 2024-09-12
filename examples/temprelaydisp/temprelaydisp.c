@@ -35,12 +35,11 @@
 #include <semaphore.h>
 
 #include <lvgl/lvgl.h>
-#include <port/lv_port.h>
+//#include <port/lv_port.h> TODO needed?
 #include <lvgl/demos/lv_demos.h>
 #include "lvgl_myview.h"
 #ifdef CONFIG_LIBUV
 #  include <uv.h>
-#  include <port/lv_port_libuv.h>
 #endif
 /****************************************************************************
  * Pre-processor Definitions
