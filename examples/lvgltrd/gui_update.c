@@ -11,6 +11,7 @@ struct gui_objs
     lv_obj_t *scale_obj;
     lv_obj_t *label_list;              // label(list) gui element data
     lv_obj_t *lv_switch;
+    lv_obj_t *arc_obj;
     const struct autoboiler_data *autob_dat_p; // pointer to input data
 };
 
@@ -47,7 +48,25 @@ static void *gui_workerthread(void *arg)
         gerr("error in thread __FUNCTION__\n");
         return NULL;
     }
+    lv_obj_t *lbl = priv->label_list;
+    lv_obj_t *scale = priv->scale_obj;
+    lv_obj_t *sw = priv->lv_switch;
+    lv_obj_t *arc = priv->arc_obj;
     for (;;)
+    {
+        nxsem_wait(&sem_lvgl);
+        //  do not directly update values, send event
+        // label only needs pointer to input data
+        lv_obj_send_event(lbl, LV_EVENT_REFRESH, (void*) priv->autob_dat_p);
+        // scale needs reference to indicator, send gui_objs pointer
+        lv_obj_send_event(scale, LV_EVENT_REFRESH, (void*) priv->autob_dat_p);
+        // send refresh event to update shown data
+        lv_obj_send_event(sw, LV_EVENT_REFRESH, (void*)priv->autob_dat_p);
+
+        lv_obj_send_event(arc, LV_EVENT_REFRESH, (void*)priv->autob_dat_p);
+        nxsem_post(&sem_lvgl);
+        usleep(100);
+    }
 // TODO
     ginfo("INFO: __FUNCTION__ exiting\n");
     return NULL;
@@ -64,6 +83,26 @@ static void myview_init_label(void)
     lv_gui_objs.label_list = lbl;
 
     lv_obj_add_event_cb(lbl, label_list_changed_event_cb, LV_EVENT_ALL, (void*) lv_gui_objs.autob_dat_p); /*Assign a callback to the gyro values*/
+}
+
+static void scale_event_handler(lv_event_t * e)
+{
+    lv_scale_section_t *arc = lv_event_get_user_data(e);
+    const struct autoboiler_data *autb_data = lv_event_get_param(e);
+    lv_scale_section_set_range(arc, 0, autb_data->temp_probe);
+}
+
+static void value_changed_event_cb(lv_event_t *e)
+{
+    lv_obj_t * arc = lv_event_get_target(e);
+    const struct autoboiler_data *autb_data = lv_event_get_param(e);
+    int32_t temp = autb_data->temp_probe;
+    if(temp > 0)
+    {
+        uint32_t angle = temp * 180 / 80 ;
+        lv_arc_set_bg_angles(arc,0, angle);
+    }
+    
 }
 
 
@@ -118,14 +157,14 @@ static void myview_init_scale(void)
     lv_scale_set_mode(scale, LV_SCALE_MODE_ROUND_OUTER);
     lv_obj_center(scale);
 
-    lv_scale_set_total_tick_count(scale, 21);
+    lv_scale_set_total_tick_count(scale, 31);
     lv_scale_set_major_tick_every(scale, 5);
 
-    lv_obj_set_style_length(scale, 5, LV_PART_ITEMS);
+    lv_obj_set_style_length(scale, 7, LV_PART_ITEMS);
     lv_obj_set_style_length(scale, 10, LV_PART_INDICATOR);
-    lv_scale_set_range(scale, 0, 100);
+    lv_scale_set_range(scale, 0, 120);
 
-    static const char * custom_labels[] = {"0 °C", "25 °C", "50 °C", "75 °C", "100 °C", NULL};
+    static const char * custom_labels[] = {"0 °C", "20 °C", "40 °C", "60 °C", "80 °C", "100 °C", "120 °C", NULL};
     lv_scale_set_text_src(scale, custom_labels);
 
     static lv_style_t indicator_style;
@@ -156,42 +195,58 @@ static void myview_init_scale(void)
     lv_obj_add_style(scale, &main_line_style, LV_PART_MAIN);
 
     /* Add a section */
-    static lv_style_t section_minor_tick_style;
-    static lv_style_t section_label_style;
-    static lv_style_t section_main_line_style;
+    static lv_style_t style_red_minor_tick_style;
+    static lv_style_t style_red_label_style;
+    static lv_style_t style_red_main_line_style;
 
-    lv_style_init(&section_label_style);
-    lv_style_init(&section_minor_tick_style);
-    lv_style_init(&section_main_line_style);
+    lv_style_init(&style_red_label_style);
+    lv_style_init(&style_red_minor_tick_style);
+    lv_style_init(&style_red_main_line_style);
 
     /* Label style properties */
-    lv_style_set_text_font(&section_label_style, LV_FONT_DEFAULT);
-    lv_style_set_text_color(&section_label_style, lv_palette_darken(LV_PALETTE_RED, 3));
+    lv_style_set_text_font(&style_red_label_style, LV_FONT_DEFAULT);
+    lv_style_set_text_color(&style_red_label_style, lv_palette_darken(LV_PALETTE_RED, 3));
 
-    lv_style_set_line_color(&section_label_style, lv_palette_darken(LV_PALETTE_RED, 3));
-    lv_style_set_line_width(&section_label_style, 5U); /*Tick width*/
+    lv_style_set_line_color(&style_red_label_style, lv_palette_darken(LV_PALETTE_RED, 3));
+    lv_style_set_line_width(&style_red_label_style, 4U); /*Tick width*/
 
-    lv_style_set_line_color(&section_minor_tick_style, lv_palette_lighten(LV_PALETTE_RED, 2));
-    lv_style_set_line_width(&section_minor_tick_style, 4U); /*Tick width*/
+    lv_style_set_line_color(&style_red_minor_tick_style, lv_palette_lighten(LV_PALETTE_RED, 2));
+    lv_style_set_line_width(&style_red_minor_tick_style, 3U); /*Tick width*/
 
     /* Main line properties */
-    lv_style_set_arc_color(&section_main_line_style, lv_palette_darken(LV_PALETTE_RED, 3));
-    lv_style_set_arc_width(&section_main_line_style, 4U); /*Tick width*/
+    lv_style_set_arc_color(&style_red_main_line_style, lv_palette_darken(LV_PALETTE_RED, 3));
+    lv_style_set_arc_width(&style_red_main_line_style, 3U); /*Tick width*/
 
     /* Configure section styles */
-    lv_scale_section_t * section = lv_scale_add_section(scale);
-    lv_scale_section_set_range(section, 75, 100);
-    lv_scale_section_set_style(section, LV_PART_INDICATOR, &section_label_style);
-    lv_scale_section_set_style(section, LV_PART_ITEMS, &section_minor_tick_style);
-    lv_scale_section_set_style(section, LV_PART_MAIN, &section_main_line_style);
+    lv_scale_section_t * redSection = lv_scale_add_section(scale);
+    lv_scale_section_set_range(redSection, 90, 120);
+    lv_scale_section_set_style(redSection, LV_PART_INDICATOR, &style_red_label_style);
+    lv_scale_section_set_style(redSection, LV_PART_ITEMS, &style_red_minor_tick_style);
+    lv_scale_section_set_style(redSection, LV_PART_MAIN, &style_red_main_line_style);
+    
+    //static lv_style_t section_arc_style;
+    //lv_style_init(&section_arc_style);
+    ///* arc properties */
+    //lv_style_set_arc_color(&section_arc_style, lv_palette_darken(LV_PALETTE_BLUE, 3));
+    //lv_style_set_arc_width(&section_arc_style, 8U); /*Tick width*/
 
-//    lv_gui_objs.meter_obj = meter;
-//    lv_gui_objs.scale = scale;
-//    lv_gui_objs.indic_temp_env = indic2;
-//    lv_gui_objs.indic_temp_probe = indic1;
-//
-//    lv_obj_add_event_cb(meter, meter_changed_event_cb, LV_EVENT_ALL, &lv_gui_objs); /*Assign a callback to the gyro values*/
+    //lv_scale_section_t * arcSection = lv_scale_add_section(scale);
+    //lv_scale_section_set_style(arcSection, LV_PART_INDICATOR, &section_arc_style);
+    //lv_scale_section_set_range(arcSection, 0, 10);
+    //lv_obj_add_event_cb(scale, scale_event_handler, LV_EVENT_ALL, (void*) arcSection);
 
+    lv_gui_objs.scale_obj = scale;
+
+    lv_obj_t * arc = lv_arc_create(scale);
+    lv_obj_set_size(arc, 150, 150);
+    lv_arc_set_rotation(arc, 135);
+    lv_arc_set_bg_angles(arc, 0, 270);
+    lv_arc_set_value(arc, 0);
+    lv_obj_remove_style(arc, NULL, LV_PART_KNOB);   /*Be sure the knob is not displayed*/
+    lv_obj_center(arc);
+    lv_obj_add_event_cb(arc, value_changed_event_cb, LV_EVENT_REFRESH, (void*) lv_gui_objs.autob_dat_p);
+
+    lv_gui_objs.arc_obj = arc;
 }
 
 #define DROPDOWN_OPTIONS_STRING "70\n80\n90\n100"
@@ -254,12 +309,12 @@ void initialize_gui_update(struct autoboiler_data * autob_dat)
     myview_init_label();
     /* create the switch for the relay*/
     myview_init_switch();
-    /* initialize the meter */
+    /* initialize the scale */
     myview_init_scale();
 
     myview_init_targettemp_dropdown();
     nxsem_post(&sem_lvgl);
-
+    
     /* start the GUI thread */
     int ret = pthread_create(&thread, NULL, gui_workerthread, (void *)&lv_gui_objs);
     if (ret != OK)

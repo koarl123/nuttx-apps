@@ -1,5 +1,5 @@
 /****************************************************************************
- * apps/examples/temprelaydisp/lvglmain.c
+ * apps/examples/lvgldemo/lvgldemo.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -21,33 +21,25 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-#ifndef SIMULATOR
-#include <nuttx/config.h>
 
-#include <sys/boardctl.h>
-#include <sys/param.h>
+#include <nuttx/config.h>
 #include <unistd.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <time.h>
-#include <debug.h>
-#include <semaphore.h>
+#include <sys/boardctl.h>
 
 #include <lvgl/lvgl.h>
-//#include <port/lv_port.h> TODO needed?
 #include <lvgl/demos/lv_demos.h>
-#include "lvgl_myview.h"
 
 #ifdef CONFIG_LV_USE_NUTTX_LIBUV
 #  include <uv.h>
 #  include <port/lv_port_libuv.h>
 #endif
+
+#include "lvgl_myview.h"
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
 
-/* Should we perform board-specific driver initialization?  There are two
+/* Should we perform board-specific driver initialization? There are two
  * ways that board initialization can occur:  1) automatically via
  * board_late_initialize() during bootupif CONFIG_BOARD_LATE_INITIALIZE
  * or 2).
@@ -67,44 +59,9 @@
 /****************************************************************************
  * Private Type Declarations
  ****************************************************************************/
-extern sem_t sem_lvgl;
-/****************************************************************************
- * Private Data
- ****************************************************************************/
 
 /****************************************************************************
  * Private Functions
- ****************************************************************************/
-static void lvgl_initialize( void )
-{
-  /* LVGL initialization */
-  lv_init();
-
-  /* LVGL port initialization */
-  lv_nuttx_dsc_init(&info);
-  //lv_port_init();
-
-  /* LVGL demo creation */
-  lv_nuttx_init(&info, &result);
-
-  lv_myview();
-
-  /* Handle LVGL tasks */
-
-  while (1)
-    {
-      uint32_t idle;
-      nxsem_wait(&sem_lvgl);
-      idle = lv_timer_handler();
-      nxsem_post(&sem_lvgl);
-      /* Minimum sleep of 1ms */
-
-      idle = idle ? idle : 1;
-      usleep(idle * 1000);
-    }
-}
-/****************************************************************************
- * Name: show_usage
  ****************************************************************************/
 
 /****************************************************************************
@@ -112,7 +69,7 @@ static void lvgl_initialize( void )
  ****************************************************************************/
 
 /****************************************************************************
- * Name: main or temprelaydisp_main
+ * Name: main or lv_demos_main
  *
  * Description:
  *
@@ -124,21 +81,57 @@ static void lvgl_initialize( void )
  *
  ****************************************************************************/
 
-int temprelaydisp_main(int argc, FAR char *argv[])
+int main(int argc, FAR char *argv[])
 {
+  lv_nuttx_dsc_t info;
+  lv_nuttx_result_t result;
+
+#ifdef CONFIG_LV_USE_NUTTX_LIBUV
+  uv_loop_t ui_loop;
+  lv_memzero(&ui_loop, sizeof(ui_loop));
+#endif 
 
 #ifdef NEED_BOARDINIT
   /* Perform board-specific driver initialization */
 
   boardctl(BOARDIOC_INIT, 0);
 
-#ifdef CONFIG_BOARDCTL_FINALINIT
-  /* Perform architecture-specific final-initialization (if configured) */
+#endif
 
-  boardctl(BOARDIOC_FINALINIT, 0);
+  lv_init();
+
+  lv_nuttx_dsc_init(&info);
+
+#ifdef CONFIG_LV_USE_NUTTX_LCD
+  info.fb_path = "/dev/lcd0";
 #endif
+
+  lv_nuttx_init(&info, &result);
+
+  if (result.disp == NULL)
+    {
+      LV_LOG_ERROR("lv_demos initialization failure!");
+      return 1;
+    }
+  lv_myview();
+
+#ifdef CONFIG_LV_USE_NUTTX_LIBUV
+  lv_nuttx_uv_loop(&ui_loop, &result);
+#else
+  while (1)
+    {
+      uint32_t idle;
+      idle = lv_timer_handler();
+
+      /* Minimum sleep of 1ms */
+
+      idle = idle ? idle : 1;
+      usleep(idle * 1000);
+    }
 #endif
-  lvgl_initialize();
-  return EXIT_SUCCESS;
+
+  lv_disp_remove(result.disp);
+  lv_deinit();
+
+  return 0;
 }
-#endif //SIMULATOR
