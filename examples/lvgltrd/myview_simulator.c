@@ -85,7 +85,7 @@ static void * simulator_thread(void * arg)
     }
     int err;
     for(;;)
-    { 
+    {
         adc_dat.am_data = CalcAdcRawValue(Pt1000TemperatureTable[temperature+50]);
         gyro_dat.temperature = temperature;
         err = write(f_adc, &adc_dat, sizeof(adc_dat));
@@ -115,7 +115,7 @@ static void * simulator_thread(void * arg)
         }
         else
         {
-            if(temperature > -20)
+            if(temperature > -5)
                 temperature-=1;
         }
         

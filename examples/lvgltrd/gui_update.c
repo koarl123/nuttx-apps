@@ -12,7 +12,7 @@ struct gui_objs
     lv_obj_t *label_list;              // label(list) gui element data
     lv_obj_t *lv_switch;
     lv_obj_t *arc_obj;
-    const struct autoboiler_data *autob_dat_p; // pointer to input data
+    struct autoboiler_data *autob_dat_p; // pointer to input data
 };
 
 struct gui_objs lv_gui_objs;
@@ -85,11 +85,9 @@ static void myview_init_label(void)
     lv_obj_add_event_cb(lbl, label_list_changed_event_cb, LV_EVENT_ALL, (void*) lv_gui_objs.autob_dat_p); /*Assign a callback to the gyro values*/
 }
 
-static void scale_event_handler(lv_event_t * e)
+static uint32_t TemperatureToAngle(uint32_t temp)
 {
-    lv_scale_section_t *arc = lv_event_get_user_data(e);
-    const struct autoboiler_data *autb_data = lv_event_get_param(e);
-    lv_scale_section_set_range(arc, 0, autb_data->temp_probe);
+    return temp * 180 / 80;
 }
 
 static void value_changed_event_cb(lv_event_t *e)
@@ -99,8 +97,9 @@ static void value_changed_event_cb(lv_event_t *e)
     int32_t temp = autb_data->temp_probe;
     if(temp > 0)
     {
-        uint32_t angle = temp * 180 / 80 ;
-        lv_arc_set_bg_angles(arc,0, angle);
+        uint32_t angle = TemperatureToAngle(temp);
+        lv_arc_set_angles(arc, 0, angle);
+        //lv_arc_set_bg_angles(arc,0, angle);
     }
     
 }
@@ -224,17 +223,6 @@ static void myview_init_scale(void)
     lv_scale_section_set_style(redSection, LV_PART_ITEMS, &style_red_minor_tick_style);
     lv_scale_section_set_style(redSection, LV_PART_MAIN, &style_red_main_line_style);
     
-    //static lv_style_t section_arc_style;
-    //lv_style_init(&section_arc_style);
-    ///* arc properties */
-    //lv_style_set_arc_color(&section_arc_style, lv_palette_darken(LV_PALETTE_BLUE, 3));
-    //lv_style_set_arc_width(&section_arc_style, 8U); /*Tick width*/
-
-    //lv_scale_section_t * arcSection = lv_scale_add_section(scale);
-    //lv_scale_section_set_style(arcSection, LV_PART_INDICATOR, &section_arc_style);
-    //lv_scale_section_set_range(arcSection, 0, 10);
-    //lv_obj_add_event_cb(scale, scale_event_handler, LV_EVENT_ALL, (void*) arcSection);
-
     lv_gui_objs.scale_obj = scale;
 
     lv_obj_t * arc = lv_arc_create(scale);
@@ -272,13 +260,16 @@ static void dropdown_changed_event_cb(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t *dd = lv_event_get_target(e);
-    struct autoboiler_data *autob_data = lv_event_get_user_data(e);
+    struct gui_objs *gui_objects = lv_event_get_user_data(e);
     if (code == LV_EVENT_VALUE_CHANGED)
     {
         uint16_t index = lv_dropdown_get_selected(dd);
-        autob_data->target_temp = GetTempFromIndex(index);
+        gui_objects->autob_dat_p->target_temp = GetTempFromIndex(index);
         lv_dropdown_set_selected(dd, index);
         lv_dropdown_set_text(dd, NULL);
+        uint32_t angle = TemperatureToAngle(gui_objects->autob_dat_p->target_temp);
+        // set visualize target temperature as background arc angle
+        lv_arc_set_bg_angles(gui_objects->arc_obj, 0, angle);
     }
 }
 
@@ -291,8 +282,9 @@ static void myview_init_targettemp_dropdown(void)
     lv_obj_add_flag(dd, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_clear_flag(dd, LV_OBJ_FLAG_HIDDEN);
     lv_dropdown_set_options(dd, DROPDOWN_OPTIONS_STRING);
-    lv_obj_add_event_cb(dd, dropdown_changed_event_cb, LV_EVENT_ALL,(void*) lv_gui_objs.autob_dat_p);
-
+    lv_obj_add_event_cb(dd, dropdown_changed_event_cb, LV_EVENT_ALL,(void*) &lv_gui_objs);
+    lv_dropdown_set_selected(dd, 0);
+    lv_obj_send_event(dd, LV_EVENT_VALUE_CHANGED, (void*)&lv_gui_objs);
     lv_obj_t * label = lv_label_create(lv_scr_act());
     lv_label_set_text(label, "Boil to: \n");
     lv_obj_set_pos(label, 30, 20);
