@@ -44,21 +44,20 @@ if(CONFIG_LIBUV)
     endif()
   endif()
 
-  if(NOT DEFINED GCCVER)
-    execute_process(COMMAND ${CMAKE_C_COMPILER} --version
-                    OUTPUT_VARIABLE GCC_VERSION_OUTPUT)
-    string(REGEX MATCH "\\+\\+.* ([0-9]+)\\.[0-9]+" GCC_VERSION_REGEX
-                 "${GCC_VERSION_OUTPUT}")
-    set(GCCVER ${CMAKE_MATCH_1})
-  endif()
   # ############################################################################
   # Flags
   # ############################################################################
 
-  set(CFLAGS -Wno-shadow -DDEF_THREADPOOL_SIZE=CONFIG_LIBUV_THREADPOOL_SIZE
-             -DDEF_THREADPOOL_STACKSIZE=CONFIG_LIBUV_THREAD_STACKSIZE)
+  set(CFLAGS
+      -Wno-shadow
+      -DDEF_THREADPOOL_SIZE=CONFIG_LIBUV_THREADPOOL_SIZE
+      -DDEF_THREADPOOL_STACKSIZE=CONFIG_LIBUV_THREAD_STACKSIZE
+      -DDEF_THREADPOOL_PRIORITY=CONFIG_LIBUV_THREADPOOL_PRIORITY
+      -DMAX_EPOLL_EVENTS=CONFIG_LIBUV_MAX_EPOLL_EVENTS
+      -DPREP_EVENT_SIZE=CONFIG_LIBUV_PREP_EVENT_SIZE
+      -DDEF_STREAM_READ_BUF_SIZE=CONFIG_LIBUV_STREAM_READ_BUF_SIZE)
 
-  if(GCCVER EQUAL 12)
+  if(GCCVER GREATER_EQUAL 12)
     list(APPEND CFLAGS -Wno-dangling-pointer)
   endif()
   # ############################################################################
@@ -146,7 +145,17 @@ if(CONFIG_LIBUV)
   target_sources(libuv PRIVATE ${SRCS})
   target_include_directories(libuv PRIVATE ${INCDIR})
   target_compile_options(libuv PRIVATE ${CFLAGS})
-  nuttx_export_header(TARGET libuv INCLUDE_DIRECTORIES ${EXPORT_INCDIR})
+
+  # Global FLAG
+  set_property(
+    TARGET nuttx
+    APPEND
+    PROPERTY NUTTX_COMPILE_OPTIONS
+             -DUV_HANDLE_BACKTRACE=CONFIG_LIBUV_HANDLE_BACKTRACE)
+  set_property(
+    TARGET nuttx
+    APPEND
+    PROPERTY NUTTX_INCLUDE_DIRECTORIES ${EXPORT_INCDIR})
 
   # ############################################################################
   # Applications Configuration

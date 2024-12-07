@@ -78,7 +78,7 @@ ifneq ($(CONFIG_TLS_NELEM),0)
 CSRCS += specific.c
 endif
 
-ifneq ($(CONFIG_PTHREAD_CLEANUP_STACKSIZE),0)
+ifneq ($(CONFIG_TLS_NCLEANUP),0)
 CSRCS += pthread_cleanup.c
 endif
 
@@ -134,7 +134,7 @@ ifeq ($(CONFIG_ARCH_SETJMP_H),y)
 CSRCS += setjmp.c
 endif
 
-ifeq ($(CONFIG_SMP_CALL),y)
+ifeq ($(CONFIG_SMP),y)
 CSRCS += smp_call.c
 endif
 
@@ -142,6 +142,10 @@ ifeq ($(CONFIG_SCHED_EVENTS),y)
 ifeq ($(CONFIG_BUILD_FLAT),y)
 CSRCS += nxevent.c
 endif
+endif
+
+ifeq ($(CONFIG_BUILD_FLAT),y)
+CSRCS += wdog.c
 endif
 
 include $(APPDIR)/Application.mk

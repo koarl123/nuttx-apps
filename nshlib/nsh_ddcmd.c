@@ -54,13 +54,6 @@
  */
 
 #define DEFAULT_SECTSIZE 512
-
-/* At present, piping of input and output are not support, i.e., both of=
- * and if= arguments are required.
- */
-
-#undef CAN_PIPE_FROM_STD
-
 #define g_dd "dd"
 
 /****************************************************************************
@@ -76,8 +69,8 @@ struct dd_s
   uint32_t     nsectors;   /* Number of sectors to transfer */
   uint32_t     skip;       /* The number of sectors skipped on input */
   uint32_t     seek;       /* The number of bytes skipped on output */
+  int          oflags;     /* The open flags on output deivce */
   bool         eof;        /* true: The end of the input or output file has been hit */
-  bool         verify;     /* true: Verify infile and outfile correctness */
   size_t       sectsize;   /* Size of one sector */
   size_t       nbytes;     /* Number of valid bytes in the buffer */
   FAR uint8_t *buffer;     /* Buffer of data to write to the output file */
@@ -133,6 +126,11 @@ static int dd_read(FAR struct dd_s *dd)
       nbytes = read(dd->infd, buffer, dd->sectsize - dd->nbytes);
       if (nbytes < 0)
         {
+          if (errno == EINTR)
+            {
+              continue;
+            }
+
           FAR struct nsh_vtbl_s *vtbl = dd->vtbl;
           nsh_error(vtbl, g_fmtcmdfailed, g_dd, "read", NSH_ERRNO);
           return ERROR;
@@ -141,7 +139,7 @@ static int dd_read(FAR struct dd_s *dd)
       dd->nbytes += nbytes;
       buffer     += nbytes;
     }
-  while (dd->nbytes < dd->sectsize && nbytes > 0);
+  while (dd->nbytes < dd->sectsize && nbytes != 0);
 
   dd->eof |= (dd->nbytes == 0);
   return OK;
@@ -170,8 +168,7 @@ static inline int dd_infopen(FAR const char *name, FAR struct dd_s *dd)
 
 static inline int dd_outfopen(FAR const char *name, FAR struct dd_s *dd)
 {
-  dd->outfd = open(name, (dd->verify ? O_RDWR : O_WRONLY) |
-                          O_CREAT | O_TRUNC, 0644);
+  dd->outfd = open(name, dd->oflags, 0644);
   if (dd->outfd < 0)
     {
       FAR struct nsh_vtbl_s *vtbl = dd->vtbl;
@@ -259,10 +256,15 @@ static int dd_verify(FAR const char *infile, FAR const char *outfile,
 
 /****************************************************************************
  * Name: cmd_dd
+ *
+ * At present, redirect of input and output are supported.
+ * of= and if= arguments are required only when verify enabled.
+ *
  ****************************************************************************/
 
 int cmd_dd(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
+  FAR struct console_stdio_s *pstate = (FAR struct console_stdio_s *)vtbl;
   struct dd_s dd;
   FAR char *infile = NULL;
   FAR char *outfile = NULL;
@@ -282,22 +284,19 @@ int cmd_dd(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
   dd.vtbl      = vtbl;              /* For nsh_output */
   dd.sectsize  = DEFAULT_SECTSIZE;  /* Sector size if 'bs=' not provided */
   dd.nsectors  = 0xffffffff;        /* MAX_UINT32 */
+  dd.oflags    = O_WRONLY | O_CREAT | O_TRUNC;
 
   /* If no IF= option is provided on the command line, then read
    * from stdin.
    */
 
-#ifdef CAN_PIPE_FROM_STD
-  dd->infd     = 0;       /* stdin */
-#endif
+  dd.infd      = INFD(pstate);      /* stdin */
 
   /* If no OF= option is provided on the command line, then write
    * to stdout.
    */
 
-#ifdef CAN_PIPE_FROM_STD
-  dd->outfd    = 1;       /* stdout */
-#endif
+  dd.outfd     = OUTFD(pstate);     /* stdout */
 
   /* Parse command line parameters */
 
@@ -339,17 +338,28 @@ int cmd_dd(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
         }
       else if (strncmp(argv[i], "verify", 6) == 0)
         {
-          dd.verify = true;
+          dd.oflags |= O_RDONLY;
+        }
+      else if (strncmp(argv[i], "conv=", 5) == 0)
+        {
+          if (strstr(argv[i], "nocreat") != NULL)
+            {
+              dd.oflags &= ~(O_CREAT | O_TRUNC);
+            }
+          else if (strstr(argv[i], "notrunc") != NULL)
+            {
+              dd.oflags &= ~O_TRUNC;
+            }
         }
     }
 
-#ifndef CAN_PIPE_FROM_STD
-  if (infile == NULL || outfile == NULL)
+  /* If verify enabled, infile and outfile are mandatory */
+
+  if ((dd.oflags & O_RDONLY) && (infile == NULL || outfile == NULL))
     {
       nsh_error(vtbl, g_fmtargrequired, g_dd);
       goto errout_with_paths;
     }
-#endif
 
   /* Allocate the I/O buffer */
 
@@ -362,18 +372,24 @@ int cmd_dd(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 
   /* Open the input file */
 
-  ret = dd_infopen(infile, &dd);
-  if (ret < 0)
+  if (infile)
     {
-      goto errout_with_alloc;
+      ret = dd_infopen(infile, &dd);
+      if (ret < 0)
+        {
+          goto errout_with_alloc;
+        }
     }
 
   /* Open the output file */
 
-  ret = dd_outfopen(outfile, &dd);
-  if (ret < 0)
+  if (outfile)
     {
-      goto errout_with_inf;
+      ret = dd_outfopen(outfile, &dd);
+      if (ret < 0)
+        {
+          goto errout_with_inf;
+        }
     }
 
   /* Then perform the data transfer */
@@ -450,16 +466,22 @@ int cmd_dd(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
              / ((double)elapsed / USEC_PER_SEC)));
 #endif
 
-  if (ret == 0 && dd.verify)
+  if (ret == 0 && (dd.oflags & O_RDONLY) != 0)
     {
       ret = dd_verify(infile, outfile, &dd);
     }
 
 errout_with_outf:
-  close(dd.outfd);
+  if (outfile)
+    {
+      close(dd.outfd);
+    }
 
 errout_with_inf:
-  close(dd.infd);
+  if (infile)
+    {
+      close(dd.infd);
+    }
 
 errout_with_alloc:
   free(dd.buffer);

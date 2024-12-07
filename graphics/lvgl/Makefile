@@ -43,15 +43,20 @@ CFLAGS += "-DLV_PROFILER_BEGIN_TAG(str)=sched_note_beginex(NOTE_TAG_GRAPHICS, st
 CFLAGS += "-DLV_PROFILER_END_TAG(str)=sched_note_endex(NOTE_TAG_GRAPHICS, str)"
 endif
 
+ifneq ($(CONFIG_LV_OPTLEVEL), "")
+# Since multiple options need to be supported, subst needs to be used here to remove
+# the redundant double quotes, otherwise it will cause command parsing errors.
+CFLAGS   += $(subst ",, $(CONFIG_LV_OPTLEVEL))
+CXXFLAGS += $(subst ",, $(CONFIG_LV_OPTLEVEL))
+endif
+
 # Set up build configuration and environment
 
 WD := ${shell echo $(CURDIR) | sed -e 's/ /\\ /g'}
 
 CONFIG_GRAPH_LVGL_URL ?= "https://github.com/lvgl/lvgl/archive/refs/tags"
 
-LVGL_PATCHS ?= $(sort $(wildcard 000*.patch))
-
-LVGL_VERSION = 9.1.0
+LVGL_VERSION = 9.2.1
 LVGL_TARBALL = v$(LVGL_VERSION).zip
 
 LVGL_UNPACKNAME = lvgl
@@ -69,7 +74,6 @@ $(LVGL_UNPACKNAME): $(LVGL_TARBALL)
 	$(ECHO_BEGIN)"Unpacking: $(LVGL_TARBALL) -> $(LVGL_UNPACKNAME)"
 	$(Q) $(UNPACK) $(LVGL_TARBALL)
 	$(Q) mv	lvgl-$(LVGL_VERSION) $(LVGL_UNPACKNAME)
-	$(Q) cat $(LVGL_PATCHS) | patch -s -N -d $(LVGL_UNPACKNAME) -p1
 	$(Q) touch $(LVGL_UNPACKNAME)
 	$(ECHO_END)
 

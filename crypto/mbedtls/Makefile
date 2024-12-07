@@ -68,6 +68,7 @@ $(MBEDTLS_UNPACKNAME): $(MBEDTLS_ZIP)
 	$(Q) mv	mbedtls-$(MBEDTLS_VERSION) $(MBEDTLS_UNPACKNAME)
 	$(Q) patch -p1 -d $(MBEDTLS_UNPACKNAME) < 0001-mbedtls-entropy_poll-use-getrandom-to-get-the-system.patch
 	$(Q) patch -p1 -d $(MBEDTLS_UNPACKNAME) < 0002-mbedtls-add-mbedtls-x509-crt-pool.patch
+	$(Q) patch -p1 -d $(MBEDTLS_UNPACKNAME) < 0003-Fix-MBEDTLS_SSL_DTLS_CONNECTION_ID_COMPAT-warning.patch
 	$(Q) touch $(MBEDTLS_UNPACKNAME)
 
 # Download and unpack tarball if no git repo found
@@ -107,7 +108,7 @@ endif
 
 # Configuration alternative implementation
 
-ifeq ($(CONFIG_MBEDTLS_ENTROPY_HARDWARE_ALT),y)
+ifneq ($(CONFIG_MBEDTLS_ENTROPY_HARDWARE_ALT)$(CONFIG_MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG),)
 CSRCS += $(APPDIR)/crypto/mbedtls/source/entropy_alt.c
 endif
 
@@ -119,8 +120,20 @@ ifeq ($(CONFIG_MBEDTLS_AES_ALT),y)
 CSRCS += $(APPDIR)/crypto/mbedtls/source/aes_alt.c
 endif
 
+ifeq ($(CONFIG_MBEDTLS_CMAC_ALT),y)
+CSRCS += $(APPDIR)/crypto/mbedtls/source/cmac_alt.c
+endif
+
 ifeq ($(CONFIG_MBEDTLS_MD5_ALT),y)
 CSRCS += $(APPDIR)/crypto/mbedtls/source/md5_alt.c
+endif
+
+ifeq ($(CONFIG_MBEDTLS_POLY1305_ALT),y)
+CSRCS += $(APPDIR)/crypto/mbedtls/source/poly1305_alt.c
+endif
+
+ifeq ($(CONFIG_MBEDTLS_RIPEMD160_ALT),y)
+CSRCS += $(APPDIR)/crypto/mbedtls/source/ripemd160_alt.c
 endif
 
 ifeq ($(CONFIG_MBEDTLS_SHA1_ALT),y)
@@ -133,6 +146,10 @@ endif
 
 ifeq ($(CONFIG_MBEDTLS_SHA512_ALT),y)
 CSRCS += $(APPDIR)/crypto/mbedtls/source/sha512_alt.c
+endif
+
+ifeq ($(CONFIG_MBEDTLS_BIGNUM_ALT),y)
+CSRCS += $(APPDIR)/crypto/mbedtls/source/bignum_alt.c
 endif
 
 endif

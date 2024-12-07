@@ -28,7 +28,6 @@ LIBUV_TARBALL  = v$(LIBUV_VERSION).zip
 LIBUV_URL_BASE = https://github.com/libuv/libuv/archive/refs/tags
 LIBUV_URL      = $(LIBUV_URL_BASE)/$(LIBUV_TARBALL)
 
-
 $(LIBUV_TARBALL):
 	@echo "Downloading: $(LIBUV_TARBALL)"
 	$(Q) curl -L $(LIBUV_URL) -o $(LIBUV_TARBALL)
@@ -51,12 +50,12 @@ CFLAGS += -I$(LIBUV_UNPACK)/test
 CFLAGS += -Wno-shadow
 CFLAGS += -DDEF_THREADPOOL_SIZE=CONFIG_LIBUV_THREADPOOL_SIZE
 CFLAGS += -DDEF_THREADPOOL_STACKSIZE=CONFIG_LIBUV_THREAD_STACKSIZE
+CFLAGS += -DDEF_THREADPOOL_PRIORITY=CONFIG_LIBUV_THREADPOOL_PRIORITY
+CFLAGS += -DMAX_EPOLL_EVENTS=CONFIG_LIBUV_MAX_EPOLL_EVENTS
+CFLAGS += -DPREP_EVENT_SIZE=CONFIG_LIBUV_PREP_EVENT_SIZE
+CFLAGS += -DDEF_STREAM_READ_BUF_SIZE=CONFIG_LIBUV_STREAM_READ_BUF_SIZE
 
-ifeq ($(GCCVER),)
-  export GCCVER = $(shell $(CC) --version | grep gcc | sed -r 's/.* ([0-9]+\.[0-9]+).*/\1/' | cut -d'.' -f1)
-endif
-
-ifeq ($(GCCVER),12)
+ifeq ($(shell expr "$(GCCVER)" \>= 12), 1)
   CFLAGS += -Wno-dangling-pointer
 endif
 
@@ -74,7 +73,12 @@ CSRCS += loop.c
 CSRCS += thread.c
 CSRCS += thread-common.c
 CSRCS += posix-hrtime.c
+ifneq ($(CONFIG_LIBUV_BACKEND_EPOLL),)
+CSRCS += linux.c
+else
 CSRCS += posix-poll.c
+CSRCS += no-fsevents.c
+endif
 CSRCS += uv-data-getter-setters.c
 CSRCS += version.c
 ifeq ($(CONFIG_LIBUV_UTILS_TEST),)
@@ -82,7 +86,6 @@ CSRCS += idna.c
 CSRCS += strscpy.c
 CSRCS += strtok.c
 endif
-CSRCS += no-fsevents.c
 CSRCS += uv-common.c
 CSRCS += random-devurandom.c
 CSRCS += random.c

@@ -60,8 +60,6 @@
 #define CAN           0x18  /* Two of these in succession aborts transfer */
 #define CRC           0x43  /* 'C' == 0x43, request 16-bit CRC */
 
-#define MAX_RETRIES   100
-
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
@@ -216,7 +214,7 @@ recv_packet:
       /* other errors, like ETIMEDOUT, EILSEQ, EBADMSG... */
 
       tcflush(ctx->recvfd, TCIOFLUSH);
-      if (++retries > MAX_RETRIES)
+      if (++retries > ctx->retry)
         {
           ymodem_debug("recv_file: too many errors, cancel!!\n");
           goto cancel;
@@ -309,24 +307,25 @@ cancel:
 
 static int ymodem_recv_cmd(FAR struct ymodem_ctx_s *ctx, uint8_t cmd)
 {
+  uint8_t recv;
   int ret;
 
-  ret = ymodem_recv_buffer(ctx, ctx->header, 1);
+  ret = ymodem_recv_buffer(ctx, &recv, 1);
   if (ret < 0)
     {
       ymodem_debug("recv cmd error\n");
       return ret;
     }
 
-  if (ctx->header[0] == NAK)
+  if (recv == NAK)
     {
       return -EAGAIN;
     }
 
-  if (ctx->header[0] != cmd)
+  if (recv != cmd)
     {
       ymodem_debug("recv cmd error, must 0x%x, but receive 0x%x\n",
-                   cmd, ctx->header[0]);
+                   cmd, recv);
       return -EINVAL;
     }
 
@@ -340,7 +339,7 @@ static int ymodem_send_file(FAR struct ymodem_ctx_s *ctx)
   int ret;
 
   ymodem_debug("waiting handshake\n");
-  for (retries = 0; retries < MAX_RETRIES; retries++)
+  for (retries = 0; retries < ctx->retry; retries++)
     {
       ret = ymodem_recv_cmd(ctx, CRC);
       if (ret >= 0)
@@ -349,7 +348,7 @@ static int ymodem_send_file(FAR struct ymodem_ctx_s *ctx)
         }
     }
 
-  if (retries >= MAX_RETRIES)
+  if (retries >= ctx->retry)
     {
       ymodem_debug("waiting handshake error\n");
       return -ETIMEDOUT;
@@ -581,7 +580,7 @@ int ymodem_recv(FAR struct ymodem_ctx_s *ctx)
   tcgetattr(ctx->recvfd, &term);
   memcpy(&saveterm, &term, sizeof(struct termios));
   cfmakeraw(&term);
-  term.c_cc[VTIME] = 15;
+  term.c_cc[VTIME] = ctx->interval;
   term.c_cc[VMIN] = 255;
   tcsetattr(ctx->recvfd, TCSANOW, &term);
 

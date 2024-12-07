@@ -209,6 +209,10 @@ void signest_test(void);
 
 void suspend_test(void);
 
+/* wdog.c *******************************************************************/
+
+void wdog_test(void);
+
 /* posixtimers.c ************************************************************/
 
 void timer_test(void);
@@ -272,7 +276,7 @@ void setjmp_test(void);
 
 /* smp_call.c ***************************************************************/
 
-#ifdef CONFIG_SMP_CALL
+#ifdef CONFIG_SMP
 void smp_call_test(void);
 #endif
 

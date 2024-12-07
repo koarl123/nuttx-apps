@@ -67,9 +67,9 @@ nxcodec_context_dequeue_buf(FAR nxcodec_context_t *ctx)
   ret = ioctl(codec->fd, VIDIOC_DQBUF, &buf);
   if (ret < 0)
     {
-      printf("%s: VIDIOC_DQBUF - %s\n",
-        V4L2_TYPE_IS_OUTPUT(ctx->type) ? "output" : "capture",
-        strerror(errno));
+      printf("nxcodec %s VIDIOC_DQBUF - %s\n",
+             V4L2_TYPE_IS_OUTPUT(ctx->type) ? "output" : "capture",
+             strerror(errno));
       return NULL;
     }
 
@@ -265,16 +265,39 @@ int nxcodec_context_dequeue_frame(FAR nxcodec_context_t *ctx)
 int nxcodec_context_get_format(FAR nxcodec_context_t *ctx)
 {
   FAR nxcodec_t *codec = nxcodec_context_to_nxcodec(ctx);
+  struct v4l2_fmtdesc fdesc;
+  int ret;
 
-  memset(&ctx->fdesc, 0, sizeof(ctx->fdesc));
-  ctx->fdesc.type = ctx->type;
+  fdesc.type = ctx->type;
+  while (true)
+    {
+      ret = ioctl(codec->fd, VIDIOC_ENUM_FMT, &fdesc);
+      if (ret < 0)
+        {
+          printf("nxcodec %s enum_fmt error: %d\n",
+                 V4L2_TYPE_IS_OUTPUT(ctx->type) ? "output" : "capture",
+                 errno);
+          return -errno;
+        }
 
-  return ioctl(codec->fd, VIDIOC_ENUM_FMT, &ctx->fdesc) < 0 ? -errno : 0;
+      if (fdesc.pixelformat == ctx->format.fmt.pix.pixelformat)
+        {
+          break;
+        }
+
+      fdesc.index++;
+    }
+
+  ctx->format.type = ctx->type;
+  return ioctl(codec->fd, VIDIOC_TRY_FMT, &ctx->format) < 0 ? -errno : 0;
 }
 
 int nxcodec_context_set_format(FAR nxcodec_context_t *ctx)
 {
   FAR nxcodec_t *codec = nxcodec_context_to_nxcodec(ctx);
+
+  printf("nxcodec %s VIDIOC_S_FMT\n",
+         V4L2_TYPE_IS_OUTPUT(ctx->type) ? "output" : "capture");
 
   return ioctl(codec->fd, VIDIOC_S_FMT, &ctx->format) < 0 ? -errno : 0;
 }
@@ -294,8 +317,9 @@ int nxcodec_context_init(FAR nxcodec_context_t *ctx)
   ret = ioctl(codec->fd, VIDIOC_REQBUFS, &req);
   if (ret < 0)
     {
-      printf("type: %d VIDIOC_REQBUFS failed: %s\n",
-              ctx->type, strerror(errno));
+      printf("nxcodec type: %s, VIDIOC_REQBUFS failed: %s\n",
+             V4L2_TYPE_IS_OUTPUT(ctx->type) ? "output" : "capture",
+             strerror(errno));
       return -errno;
     }
 
@@ -303,7 +327,8 @@ int nxcodec_context_init(FAR nxcodec_context_t *ctx)
   ctx->buf = calloc(ctx->nbuffers, sizeof(nxcodec_context_buf_t));
   if (!ctx->buf)
     {
-      printf("type: %d malloc enomem\n", ctx->type);
+      printf("nxcodec type: %s, alloc memory error\n",
+             V4L2_TYPE_IS_OUTPUT(ctx->type) ? "output" : "capture");
       return -ENOMEM;
     }
 
@@ -375,8 +400,9 @@ void nxcodec_context_uninit(FAR nxcodec_context_t *ctx)
         {
           if (munmap(buf->addr, buf->length) < 0)
             {
-              printf("type: %d unmap plane (%s))\n",
-                      ctx->type, strerror(errno));
+              printf("nxcodec type: %s, unmap plane (%s))\n",
+                     V4L2_TYPE_IS_OUTPUT(ctx->type) ? "output" : "capture",
+                     strerror(errno));
             }
         }
     }

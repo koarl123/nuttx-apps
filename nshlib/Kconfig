@@ -231,6 +231,13 @@ config NSH_ALIAS_MAX_AMOUNT
 
 endif # NSH_ALIAS
 
+config NSH_PIPELINE
+	bool "Enable pipeline support"
+	default !DEFAULT_SMALL
+	depends on PIPES
+	---help---
+		Enable pipeline support for nsh.
+
 endmenu # Command Line Configuration
 
 config NSH_BUILTIN_APPS
@@ -427,6 +434,11 @@ config NSH_DISABLE_IFUPDOWN
 config NSH_DISABLE_KILL
 	bool "Disable kill"
 	default DEFAULT_SMALL
+
+config NSH_DISABLE_PKILL
+	bool "Disable pkill"
+	default DEFAULT_SMALL
+	depends on FS_PROCFS
 
 config NSH_DISABLE_LOSETUP
 	bool "Disable losetup"
@@ -632,6 +644,11 @@ config NSH_DISABLE_TEST
 	bool "Disable test"
 	default DEFAULT_SMALL
 
+config NSH_DISABLE_TOP
+	bool "Disable top"
+	default DEFAULT_SMALL
+	depends on !NSH_DISABLE_PS
+
 config NSH_DISABLE_TRUNCATE
 	bool "Disable truncate"
 	default DEFAULT_SMALL
@@ -693,6 +710,16 @@ config NSH_DISABLE_IRQ_AFFINITY
 	bool "Disable command of irq affinity"
 	default DEFAULT_SMALL
 	depends on BOARDCTL_IRQ_AFFINITY
+
+config NSH_DISABLE_WAIT
+	bool "Disable wait"
+	default DEFAULT_SMALL
+	depends on SCHED_WAITPID
+	depends on FS_PROCFS && !FS_PROCFS_EXCLUDE_PROCESS
+
+config NSH_DISABLE_WATCH
+	bool "Disable watch"
+	default DEFAULT_SMALL
 
 endmenu
 

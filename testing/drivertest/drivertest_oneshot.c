@@ -29,12 +29,16 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <setjmp.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <cmocka.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <syslog.h>
+#include <nuttx/clock.h>
 #include <nuttx/timers/oneshot.h>
 
 /****************************************************************************

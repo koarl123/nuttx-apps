@@ -83,7 +83,7 @@ if(CONFIG_TESTING_OSTEST)
       list(APPEND SRCS specific.c)
     endif()
 
-    if(NOT CONFIG_PTHREAD_CLEANUP_STACKSIZE EQUAL 0)
+    if(NOT CONFIG_TLS_NCLEANUP EQUAL 0)
       list(APPEND SRCS pthread_cleanup.c)
     endif()
 
@@ -139,12 +139,16 @@ if(CONFIG_TESTING_OSTEST)
     list(APPEND SRCS setjmp.c)
   endif()
 
-  if(CONFIG_SMP_CALL)
+  if(CONFIG_SMP)
     list(APPEND SRCS smp_call.c)
   endif()
 
   if(CONFIG_SCHED_EVENTS AND CONFIG_BUILD_FLAT)
     list(APPEND SRCS nxevent.c)
+  endif()
+
+  if(CONFIG_BUILD_FLAT)
+    list(APPEND SRCS wdog.c)
   endif()
 
   set(OSTEST_SRCS ostest_main.c ${SRCS})

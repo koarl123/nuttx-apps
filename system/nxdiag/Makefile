@@ -57,6 +57,10 @@ ifeq ($(CONFIG_SYSTEM_NXDIAG_HOST_PATH),y)
 NXDIAG_FLAGS += --path
 endif
 
+ifeq ($(CONFIG_SYSTEM_NXDIAG_VERBOSE),y)
+NXDIAG_FLAGS += --verbose
+endif
+
 # Vendor-specific checks
 
 # Espressif
@@ -89,6 +93,14 @@ else
 NXDIAG_FLAGS += --espressif "$(TOPDIR)" "$(HALDIR)"
 endif
 
+ifeq ($(CONFIG_SYSTEM_NXDIAG_ESPRESSIF_CHIP),y)
+ifneq ($(CONFIG_SYSTEM_NXDIAG_ESPRESSIF_CHIP_WO_TOOL),y)
+NXDIAG_FLAGS += --espressif_chip
+else
+NXDIAG_FLAGS += --espressif_chip_runtime
+endif
+endif
+
 endif
 
 # Common build
@@ -109,7 +121,7 @@ sysinfo.h : checkpython3 $(INFO_DEPS)
 		exit 1; \
 	fi
 
-context:: sysinfo.h
+depend:: sysinfo.h
 
 distclean::
 	$(call DELFILE, sysinfo.h)

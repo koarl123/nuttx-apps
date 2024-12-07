@@ -1,4 +1,6 @@
 *.a
+*.dbo
+*.dba
 *.adb
 *.asm
 *.dSYM
@@ -18,6 +20,7 @@
 *.swp
 *.sym
 *.su
+*.map
 *~
 .built
 .context
@@ -25,6 +28,7 @@
 .kconfig
 *.lock
 /bin
+/bin_debug
 /boot_romfsimg.h
 /external
 /Kconfig

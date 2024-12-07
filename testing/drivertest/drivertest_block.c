@@ -63,9 +63,9 @@
 struct pre_build_s
 {
   FAR struct inode *driver;
-  FAR const char *source;
   struct mtd_geometry_s geo;
   struct geometry cfg;
+  char source[PATH_MAX];
   int fd;
 };
 
@@ -95,14 +95,14 @@ static void parse_commandline(int argc, FAR char **argv,
 {
   int option;
 
-  pre->source = NULL;
+  pre->source[0] = '\0';
 
   while ((option = getopt(argc, argv, "m:")) != ERROR)
     {
       switch (option)
         {
           case 'm':
-            pre->source = optarg;
+            strlcpy(pre->source, optarg, sizeof(pre->source));
             break;
           case '?':
             printf("Unknown option: %c\n", optopt);
@@ -111,7 +111,7 @@ static void parse_commandline(int argc, FAR char **argv,
         }
     }
 
-  if (pre->source == NULL)
+  if (pre->source[0] == '\0')
     {
       printf("Missing <source>\n");
       show_usage(argv[0], EXIT_FAILURE);
@@ -201,16 +201,15 @@ static int setup_driver(FAR void **state)
   ret = find_mtddriver(pre->source, &pre->driver);
   if (ret != 0)
     {
-      struct geometry geometry;
       ret = find_blockdriver(pre->source, 0, &pre->driver);
       assert_false(ret != 0);
 
-      ret = pre->driver->u.i_bops->geometry(pre->driver, &geometry);
+      ret = pre->driver->u.i_bops->geometry(pre->driver, &pre->cfg);
       assert_false(ret < 0);
 
-      pre->geo.blocksize = geometry.geo_sectorsize;
-      pre->geo.erasesize = geometry.geo_sectorsize;
-      pre->geo.neraseblocks = geometry.geo_nsectors;
+      pre->geo.blocksize = pre->cfg.geo_sectorsize;
+      pre->geo.erasesize = pre->cfg.geo_sectorsize;
+      pre->geo.neraseblocks = pre->cfg.geo_nsectors;
     }
   else
     {
@@ -313,7 +312,7 @@ static void blktest_cachesize_write(FAR void **state)
 
   if (size > pre->geo.blocksize && (size % pre->geo.blocksize) == 0)
     {
-      block = (pre->geo.blocksize + size) / pre->geo.blocksize - 1;
+      block = size / pre->geo.blocksize;
     }
   else
     {
@@ -326,9 +325,17 @@ static void blktest_cachesize_write(FAR void **state)
 
   size = block * pre->geo.blocksize;
 
+  if (size > pre->geo.erasesize * pre->geo.neraseblocks)
+    {
+      printf("Warning: Total block size too small,"
+             "need larger than %" PRId32 "\n",
+             size);
+      return;
+    }
+
   if (size > pre->geo.erasesize && (size % pre->geo.erasesize) == 0)
     {
-      eblock = (pre->geo.erasesize + size) / pre->geo.erasesize - 1;
+      eblock = size / pre->geo.erasesize;
     }
   else
     {
@@ -469,20 +476,29 @@ static int teardown_bch(FAR void **state)
 
 int main(int argc, FAR char *argv[])
 {
-  struct pre_build_s pre;
+  struct pre_build_s *pre;
+  int ret;
 
-  parse_commandline(argc, argv, &pre);
+  pre = kmm_zalloc(sizeof(*pre));
+  if (pre == NULL)
+    {
+      return -ENOMEM;
+    }
+
+  parse_commandline(argc, argv, pre);
   const struct CMUnitTest tests[] =
     {
       cmocka_unit_test_prestate_setup_teardown(blktest_stress, setup_bch,
-                                               teardown_bch, &pre),
+                                               teardown_bch, pre),
       cmocka_unit_test_prestate_setup_teardown(blktest_single_write,
                                                setup_driver, teardown_driver,
-                                               &pre),
+                                               pre),
       cmocka_unit_test_prestate_setup_teardown(blktest_cachesize_write,
                                                setup_driver, teardown_driver,
-                                               &pre),
+                                               pre),
     };
 
-  return cmocka_run_group_tests(tests, NULL, NULL);
+  ret = cmocka_run_group_tests(tests, NULL, NULL);
+  kmm_free(pre);
+  return ret;
 }

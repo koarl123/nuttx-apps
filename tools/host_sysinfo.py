@@ -30,6 +30,82 @@ class validate_flags_arg(argparse.Action):
 # Espressif #
 
 
+def run_espressif_tool(cmd):
+    tool = "esptool.py"
+    strings_out = ""
+    command = "{} {}".format(tool, cmd)
+
+    strings_out = subprocess.run(
+        command, universal_newlines=True, shell=True, capture_output=True
+    )
+
+    return strings_out.stdout
+
+
+def get_espressif_chip_id():
+    output = run_espressif_tool("chip_id")
+    string_out = next((s for s in output.split("\n") if "Chip ID" in s), "Not found")
+    if string_out != "Not found":
+        string_out = string_out.split("Warning: ")[-1]
+    return string_out
+
+
+def get_espressif_flash_id():
+    strings_out = []
+    output = run_espressif_tool("flash_id")
+
+    strings_out.append(
+        next(
+            (s for s in output.split("\n") if "Manufacturer" in s),
+            "Manufacturer: Not found",
+        )
+    )
+    strings_out.append(
+        next((s for s in output.split("\n") if "Device" in s), "Device: Not found")
+    )
+
+    return strings_out
+
+
+def get_espressif_security_info():
+    output = run_espressif_tool("get_security_info")
+
+    start_string = "====================="
+    stop_string = "Hard resetting via RTS pin..."
+    output = output.split("\n")
+    strings_out = []
+
+    str_out = next((s for s in output if start_string in s), "Not found")
+    if str_out != "Not found":
+        start_index = output.index(start_string) + 1
+        stop_index = output.index(stop_string)
+        strings_out = output[start_index:stop_index]
+    else:
+        strings_out.append(str_out)
+
+    return strings_out
+
+
+def get_espressif_flash_status():
+    output = run_espressif_tool("read_flash_status")
+
+    string_out = next(
+        (s for s in output.split("\n") if "Status value" in s), "Not found"
+    )
+    if string_out != "Not found":
+        string_out = string_out.split("Status value: ")[-1]
+    return string_out
+
+
+def get_espressif_mac_address():
+    output = run_espressif_tool("read_mac")
+
+    string_out = next((s for s in output.split("\n") if "MAC" in s), "Not found")
+    if string_out != "Not found":
+        string_out = string_out.split("MAC: ")[-1]
+    return string_out
+
+
 def get_espressif_bootloader_version(bindir):
     """
     Get the bootloader version for Espressif chips from the bootloader binary. This
@@ -159,6 +235,60 @@ def get_espressif_hal_version(hal_dir):
 
 
 # Common functions #
+
+
+def verbose(info, logs):
+    """
+    Prepare and print information on build screen.
+
+    Args:
+        info (dict): Information dictionary of build system.
+        logs (str): Vendor specific information string.
+
+    Returns:
+        None.
+    """
+
+    if args.verbose:
+
+        out_str = "\n" + "=" * 79 + "\n"
+
+        out_str += "NuttX RTOS info: {}\n\n".format(info["OS_VERSION"])
+        if args.flags:
+            out_str += "NuttX CFLAGS: {}\n\n".format(info["NUTTX_CFLAGS"])
+            out_str += "NuttX CXXFLAGS: {}\n\n".format(info["NUTTX_CXXFLAGS"])
+            out_str += "NuttX LDFLAGS: {}\n\n".format(info["NUTTX_LDFLAGS"])
+
+        if args.config:
+            out_str += "NuttX configuration options: \n"
+            for i in range(len(info["NUTTX_CONFIG"])):
+                out_str += "  " + info["NUTTX_CONFIG"][i].replace('"', '\\"') + "\n"
+            out_str += "\n\n"
+
+        if args.path:
+            out_str += "Host system PATH: \n"
+            for i in range(len(info["SYSTEM_PATH"])):
+                out_str += "  " + info["SYSTEM_PATH"][i] + "\n"
+            out_str += "\n\n"
+
+        if args.packages:
+            out_str += "Host system installed packages: \n"
+            for i in range(len(info["INSTALLED_PACKAGES"])):
+                out_str += "  " + info["INSTALLED_PACKAGES"][i] + "\n"
+            out_str += "\n\n"
+
+        if args.modules:
+            out_str += "Host system installed python modules: \n"
+            for i in range(len(info["PYTHON_MODULES"])):
+                out_str += "  " + info["PYTHON_MODULES"][i] + "\n"
+            out_str += "\n\n"
+
+        if args.espressif:
+            out_str += "Espressif specific information: \n\n"
+            out_str += logs
+            out_str += "=" * 79 + "\n"
+
+        eprint(out_str)
 
 
 def eprint(*args, **kwargs):
@@ -393,6 +523,7 @@ def generate_header(args):
 
     info = {}
     output = ""
+    build_output = ""
 
     output += "/****************************************************************************\n"
     output += " * sysinfo.h\n"
@@ -526,9 +657,12 @@ def generate_header(args):
             len(info["ESPRESSIF_BOOTLOADER"])
         )
         output += "static const char *ESPRESSIF_BOOTLOADER[ESPRESSIF_BOOTLOADER_ARRAY_SIZE] =\n{\n"
+        build_output = "Bootloader version:\n"
         for key, value in info["ESPRESSIF_BOOTLOADER"].items():
             output += '  "{}: {}",\n'.format(key, value)
+            build_output += "  {}: {},\n".format(key, value)
         output += "};\n\n"
+        build_output += "\n\n"
 
         # Espressif toolchain version
 
@@ -537,9 +671,12 @@ def generate_header(args):
             len(info["ESPRESSIF_TOOLCHAIN"])
         )
         output += "static const char *ESPRESSIF_TOOLCHAIN[ESPRESSIF_TOOLCHAIN_ARRAY_SIZE] =\n{\n"
+        build_output += "Toolchain version:\n"
         for key, value in info["ESPRESSIF_TOOLCHAIN"].items():
             output += '  "{}: {}",\n'.format(key, value)
+            build_output += "  {}: {},\n".format(key, value)
         output += "};\n\n"
+        build_output += "\n\n"
 
         # Espressif esptool version
 
@@ -549,6 +686,9 @@ def generate_header(args):
         output += 'static const char ESPRESSIF_ESPTOOL[] = "{}";\n\n'.format(
             info["ESPRESSIF_ESPTOOL"].split("-")[1]
         )
+        build_output += "Esptool version: {}\n\n".format(
+            info["ESPRESSIF_ESPTOOL"].split("-")[1]
+        )
 
         # Espressif HAL version
 
@@ -556,6 +696,56 @@ def generate_header(args):
         output += 'static const char ESPRESSIF_HAL[] = "{}";\n\n'.format(
             info["ESPRESSIF_HAL"]
         )
+        build_output += "HAL version: {}\n\n".format(info["ESPRESSIF_HAL"])
+
+        if args.espressif_chip and info["ESPRESSIF_ESPTOOL"] not in "Not found":
+            info["ESPRESSIF_CHIP_ID"] = get_espressif_chip_id()
+            output += 'static const char ESPRESSIF_CHIP_ID[] = "{}";\n\n'.format(
+                info["ESPRESSIF_CHIP_ID"]
+            )
+            build_output += "CHIP ID: = {}\n\n".format(info["ESPRESSIF_CHIP_ID"])
+
+            info["ESPRESSIF_FLASH_ID"] = get_espressif_flash_id()
+            output += "#define ESPRESSIF_FLASH_ID_ARRAY_SIZE {}\n".format(
+                len(info["ESPRESSIF_FLASH_ID"])
+            )
+            output += "static const char *ESPRESSIF_FLASH_ID[ESPRESSIF_FLASH_ID_ARRAY_SIZE] =\n{\n"
+            build_output += "Flash ID:\n"
+            for each_item in info["ESPRESSIF_FLASH_ID"]:
+                output += '  "{}",\n'.format(each_item)
+                build_output += "  {}\n".format(each_item)
+            output += "};\n\n"
+            build_output += "\n\n"
+
+            info["ESPRESSIF_SECURITY_INFO"] = get_espressif_security_info()
+            output += "#define ESPRESSIF_SECURITY_INFO_ARRAY_SIZE {}\n".format(
+                len(info["ESPRESSIF_SECURITY_INFO"])
+            )
+            output += "static const char *ESPRESSIF_SECURITY_INFO[ESPRESSIF_SECURITY_INFO_ARRAY_SIZE] =\n{\n"
+            build_output += "Security information: \n"
+            for each_item in info["ESPRESSIF_SECURITY_INFO"]:
+                output += '  "{}",\n'.format(each_item)
+                build_output += "  {}\n".format(each_item)
+            output += "};\n\n"
+            build_output += "\n\n"
+
+            info["ESPRESSIF_FLASH_STAT"] = get_espressif_flash_status()
+            output += 'static const char ESPRESSIF_FLASH_STAT[] = "{}";\n\n'.format(
+                info["ESPRESSIF_FLASH_STAT"]
+            )
+            build_output += "Flash status: {}\n\n".format(info["ESPRESSIF_FLASH_STAT"])
+
+            info["ESPRESSIF_MAC_ADDR"] = get_espressif_mac_address()
+            output += 'static const char ESPRESSIF_MAC_ADDR[] = "{}";\n\n'.format(
+                info["ESPRESSIF_MAC_ADDR"]
+            )
+            build_output += "MAC address:  {}\n\n".format(info["ESPRESSIF_MAC_ADDR"])
+
+        elif args.espressif_chip_runtime:
+            output += "#define ESPRESSIF_INFO_SIZE 384\n"
+            output += "static char ESPRESSIF_INFO[ESPRESSIF_TOOLCHAIN_ARRAY_SIZE] =\n{\n  0\n};\n\n"
+
+    verbose(info, build_output)
 
     output += "#endif /* __SYSTEM_INFO_H */\n"
 
@@ -587,9 +777,18 @@ if __name__ == "__main__":
                         Get the NuttX compilation configurations used.
             -f, --flags <CFLAGS> <CXXFLAGS> <LDFLAGS>:
                         Provide the NuttX compilation flags used.
+            --verbose:
+                        Enable printing information during build.
             --espressif <ESPTOOL_BINDIR>:
                         Get Espressif specific information.
                         Requires the path to the bootloader binary directory.
+            --espressif_chip:
+                        Get Espressif specific information about chip.
+                        Requires device connection during build.
+            --espressif_chip_runtime:
+                        Get Espressif specific information about chip
+                        on runtime.
+                        Requires device connection during build.
     """
 
     # Generic arguments
@@ -636,6 +835,11 @@ if __name__ == "__main__":
         action=validate_flags_arg,
         help="Provide the NuttX compilation and linker flags used.",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable printing information during build",
+    )
 
     # Vendor specific arguments
 
@@ -645,6 +849,18 @@ if __name__ == "__main__":
         default=[],
         metavar=("ESPTOOL_BINDIR", "ESP_HAL_DIR"),
         help="Get Espressif specific information. Requires the path to the bootloader binary and ESP HAL directories.",
+    )
+
+    parser.add_argument(
+        "--espressif_chip",
+        action="store_true",
+        help="Get Espressif specific information about chip. Requires device connection during build.",
+    )
+
+    parser.add_argument(
+        "--espressif_chip_runtime",
+        action="store_true",
+        help="Get Espressif specific information about chip on runtime. Requires device connection during build.",
     )
 
     # Parse arguments
